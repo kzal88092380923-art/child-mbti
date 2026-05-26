@@ -1,7 +1,5 @@
 import { useState, useEffect, useRef } from "react";
 
-// ===================== MBTI 문항 =====================
-
 const QUESTIONS = {
   // 5~7세 · 유치원/집 실제 상황 · 각 축 2문항씩
   "5-7": [
@@ -297,13 +295,27 @@ export default function ChildMBTI() {
       input[type=range]::-moz-range-track { height: 8px; border-radius: 4px; background: #E8E8E8; }
       input[type=range]::-moz-range-thumb { width: 44px; height: 44px; border-radius: 50%; background: linear-gradient(135deg, #7C3AED, #4F46E5); border: 3px solid white; cursor: pointer; }
       @keyframes pop { 0% { transform: scale(0.8); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
+      @keyframes popBig { 0% { transform: scale(0.4); opacity: 0; } 60% { transform: scale(1.1); opacity: 1; } 100% { transform: scale(1); opacity: 1; } }
       @keyframes slideUp { 0% { transform: translateY(20px); opacity: 0; } 100% { transform: translateY(0); opacity: 1; } }
       @keyframes bounce { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
+      @keyframes bounceBig { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-14px); } }
       @keyframes shake { 0%,100% { transform: translateX(0); } 25% { transform: translateX(-6px); } 75% { transform: translateX(6px); } }
+      @keyframes slideInRight { 0% { transform: translateX(40px); opacity: 0; } 100% { transform: translateX(0); opacity: 1; } }
+      @keyframes slideInLeft { 0% { transform: translateX(-40px); opacity: 0; } 100% { transform: translateX(0); opacity: 1; } }
+      @keyframes tapPop { 0% { transform: scale(1); } 35% { transform: scale(1.07); } 100% { transform: scale(1); } }
+      @keyframes ringPulse { 0% { box-shadow: 0 0 0 0 currentColor; opacity: 0.5; } 100% { box-shadow: 0 0 0 24px transparent; opacity: 0; } }
+      @keyframes fillIn { 0% { transform: scale(0); } 70% { transform: scale(1.3); } 100% { transform: scale(1); } }
       .pop { animation: pop 0.4s cubic-bezier(0.34,1.56,0.64,1) both; }
+      .pop-big { animation: popBig 0.6s cubic-bezier(0.34,1.56,0.64,1) both; }
       .slide-up { animation: slideUp 0.3s ease both; }
+      .slide-next { animation: slideInRight 0.4s cubic-bezier(0.4,0,0.2,1) both; }
+      .slide-prev { animation: slideInLeft 0.4s cubic-bezier(0.4,0,0.2,1) both; }
       .emoji-bounce { animation: bounce 2s ease-in-out infinite; }
+      .emoji-bounce-big { animation: bounceBig 2.4s ease-in-out infinite; }
       .shake { animation: shake 0.3s ease; }
+      .tap-pop { animation: tapPop 0.25s cubic-bezier(0.34,1.56,0.64,1); }
+      .fill-in { animation: fillIn 0.4s cubic-bezier(0.34,1.56,0.64,1) both; }
+      button:active { transform: scale(0.97); }
     `;
     document.head.appendChild(style);
   }, []);
@@ -315,7 +327,9 @@ export default function ChildMBTI() {
   const [scores, setScores] = useState({ E: 0, I: 0, S: 0, N: 0, T: 0, F: 0, J: 0, P: 0 });
   const [answerHistory, setAnswerHistory] = useState([]);
   const [result, setResult] = useState(null);
-  const [qVisible, setQVisible] = useState(true);
+  const [slideDir, setSlideDir] = useState("next");
+  const [tappedCh, setTappedCh] = useState(null);
+  const [resultStep, setResultStep] = useState("reveal");
 
   // 부모 인증
   const [parentStep, setParentStep] = useState("locked");
@@ -349,66 +363,99 @@ export default function ChildMBTI() {
     if (parentStep !== "quiz") clearTimeout(timerRef.current);
   }, [parentStep]);
 
+  // 나이대별 배경 동기화
+  useEffect(() => {
+    document.body.style.background = ageGroup && THEMES[ageGroup] ? THEMES[ageGroup].bodyBg : DEFAULT_BG;
+    document.body.style.transition = "background 0.6s ease";
+  }, [ageGroup]);
+
   const questions = ageGroup ? QUESTIONS[ageGroup] : [];
   const totalQ = questions.length;
   const progress = totalQ > 0 ? (currentQ / totalQ) * 100 : 0;
   const validAge = getAgeGroup(parseInt(ageInput));
 
-  const ageLabels = {
-    "5-7": { label: "5~7살", emoji: "🐣", color: "#FF6B9D" },
-    "8-10": { label: "8~10살", emoji: "🌱", color: "#FF8C42" },
-    "11-13": { label: "11~13살", emoji: "🌟", color: "#4361EE" },
+  const THEMES = {
+    "5-7": {
+      primary: "#FF4D6D", secondary: "#FFB627",
+      bg: "#FFE9F0", softBg: "#FFF5F8",
+      bodyBg: "linear-gradient(135deg, #FFE5EC 0%, #FFEDD5 50%, #FFE0EC 100%)",
+      btnGrad: "linear-gradient(135deg, #FF4D6D 0%, #FFB627 100%)",
+      progressIcon: "♥", progressEmpty: "♡",
+      qFontSize: "22px", choiceFontSize: "17px",
+      label: "5~7살", emoji: "🐣", subtitle: "원색 가득한 동물 친구들",
+    },
+    "8-10": {
+      primary: "#FF6B6B", secondary: "#FFA94D",
+      bg: "#FFEDE3", softBg: "#FFF5EE",
+      bodyBg: "linear-gradient(135deg, #FFF0E5 0%, #E5F9F2 50%, #FFEDE3 100%)",
+      btnGrad: "linear-gradient(135deg, #FF6B6B 0%, #FFA94D 100%)",
+      progressIcon: "★", progressEmpty: "☆",
+      qFontSize: "20px", choiceFontSize: "16px",
+      label: "8~10살", emoji: "🌱", subtitle: "생동감 있는 컬러",
+    },
+    "11-13": {
+      primary: "#5B5FFF", secondary: "#7C3AED",
+      bg: "#EEF0FF", softBg: "#F7F8FF",
+      bodyBg: "linear-gradient(135deg, #E9ECFF 0%, #F0E5FF 50%, #E2E7FF 100%)",
+      btnGrad: "linear-gradient(135deg, #5B5FFF 0%, #7C3AED 100%)",
+      progressIcon: "●", progressEmpty: "○",
+      qFontSize: "19px", choiceFontSize: "15px",
+      label: "11~13살", emoji: "🌟", subtitle: "세련된 톤",
+    },
   };
-  const groupColors = {
-    "5-7": { p: "#FF6B9D", bg: "#FFF0F6" },
-    "8-10": { p: "#FF8C42", bg: "#FFF3E8" },
-    "11-13": { p: "#4361EE", bg: "#EEF1FF" },
-  };
+  const DEFAULT_BG = "linear-gradient(135deg, #FFF5EC 0%, #FFF0F8 50%, #F0EFFF 100%)";
+  const theme = ageGroup ? THEMES[ageGroup] : null;
 
-  function startQuiz() {
-    const g = getAgeGroup(parseInt(ageInput));
+  function startQuiz(forced) {
+    const g = forced || getAgeGroup(parseInt(ageInput));
     if (!g) return;
     setAgeGroup(g);
     setScores({ E: 0, I: 0, S: 0, N: 0, T: 0, F: 0, J: 0, P: 0 });
     setAnswerHistory([]);
     setCurrentQ(0);
+    setSlideDir("next");
     setScreen("quiz");
   }
 
   function handleAnswer(choice) {
+    if (tappedCh) return;
+    setTappedCh(choice);
     const q = questions[currentQ];
-    // "C" = 잘 모르겠어요 → 중립 처리 (점수 미반영)
     let ns = scores;
     let scoredKey = null;
     if (choice !== "C") {
       scoredKey = choice === "A" ? q.sa : q.sb;
       ns = { ...scores, [scoredKey]: scores[scoredKey] + 1 };
-      setScores(ns);
     }
-    setAnswerHistory([...answerHistory, { choice, key: scoredKey }]);
-    if (currentQ + 1 >= totalQ) {
-      setResult(calcMBTI(ns));
-      setParentStep("locked");
-      setSliderVal(0);
-      setQuiz(null);
-      setQuizInput("");
-      setTimer(null);
-      setScreen("result");
-    } else {
-      setQVisible(false);
-      setTimeout(() => { setCurrentQ(currentQ + 1); setQVisible(true); }, 250);
-    }
+    setTimeout(() => {
+      if (scoredKey) setScores(ns);
+      setAnswerHistory([...answerHistory, { choice, key: scoredKey }]);
+      setTappedCh(null);
+      if (currentQ + 1 >= totalQ) {
+        setResult(calcMBTI(ns));
+        setResultStep("reveal");
+        setParentStep("locked");
+        setSliderVal(0);
+        setQuiz(null);
+        setQuizInput("");
+        setTimer(null);
+        setScreen("result");
+      } else {
+        setSlideDir("next");
+        setCurrentQ(currentQ + 1);
+      }
+    }, 260);
   }
 
   function handleBack() {
-    if (currentQ === 0 || answerHistory.length === 0) return;
+    if (currentQ === 0 || answerHistory.length === 0 || tappedCh) return;
     const last = answerHistory[answerHistory.length - 1];
     if (last.key) {
       setScores({ ...scores, [last.key]: scores[last.key] - 1 });
     }
     setAnswerHistory(answerHistory.slice(0, -1));
-    setQVisible(false);
-    setTimeout(() => { setCurrentQ(currentQ - 1); setQVisible(true); }, 250);
+    setSlideDir("prev");
+    setCurrentQ(currentQ - 1);
   }
 
   function handleSlider(e) {
@@ -453,7 +500,7 @@ export default function ChildMBTI() {
     clearTimeout(timerRef.current);
     setScreen("welcome"); setAgeInput(""); setAgeGroup(null);
     setCurrentQ(0); setScores({ E: 0, I: 0, S: 0, N: 0, T: 0, F: 0, J: 0, P: 0 });
-    setAnswerHistory([]);
+    setAnswerHistory([]); setSlideDir("next"); setTappedCh(null); setResultStep("reveal");
     setResult(null); setParentStep("locked"); setSliderVal(0);
     setQuiz(null); setQuizInput(""); setQuizErr(false); setTimer(null);
   }
@@ -475,56 +522,40 @@ export default function ChildMBTI() {
   // ── 시작 화면 ──
   if (screen === "welcome") return (
     <div style={wrap}>
-      <div style={card} className="pop">
-        <div style={{ textAlign: "center", marginBottom: "28px" }}>
-          <div style={{ fontSize: "72px", marginBottom: "12px" }} className="emoji-bounce">🌟</div>
-          <h1 style={{ fontSize: "30px", color: "#333", margin: "0 0 8px", letterSpacing: "-0.5px" }}>어린이 MBTI</h1>
-          <p style={{ color: "#AAA", fontSize: "15px", margin: 0 }}>나는 어떤 동물 친구일까요?</p>
+      <div style={{ ...card, padding: "40px 24px 32px" }} className="pop">
+        <div style={{ textAlign: "center", marginBottom: "32px" }}>
+          <div style={{ fontSize: "84px", marginBottom: "10px" }} className="emoji-bounce-big">🌟</div>
+          <h1 style={{ fontSize: "32px", color: "#333", margin: "0 0 6px", letterSpacing: "-0.5px" }}>어린이 MBTI</h1>
+          <p style={{ color: "#AAA", fontSize: "15px", margin: 0 }}>나는 어떤 동물 친구일까?</p>
         </div>
-        <div style={{ marginBottom: "20px" }}>
-          <p style={{ textAlign: "center", color: "#666", fontSize: "16px", marginBottom: "12px" }}>몇 살이에요? 🎂</p>
-          <input
-            type="number" min="5" max="13" value={ageInput}
-            onChange={e => setAgeInput(e.target.value)}
-            onKeyDown={e => e.key === "Enter" && validAge && startQuiz()}
-            placeholder="나이 입력 (5~13세)"
-            style={{
-              width: "100%", padding: "16px", borderRadius: "16px",
-              border: `2.5px solid ${validAge ? groupColors[validAge].p : "#E8E8E8"}`,
-              fontSize: "20px", textAlign: "center", outline: "none",
-              fontFamily: "inherit", color: "#333", transition: "border-color 0.2s",
-            }}
-          />
-          {ageInput && !validAge && (
-            <p style={{ color: "#FF6B6B", fontSize: "13px", textAlign: "center", marginTop: "8px" }}>5살 ~ 13살만 이용할 수 있어요 🙏</p>
-          )}
-          {validAge && (
-            <p style={{ color: groupColors[validAge].p, fontSize: "13px", textAlign: "center", marginTop: "8px", fontWeight: "700" }}>
-              {ageLabels[validAge].emoji} {ageLabels[validAge].label} 문항으로 시작해요!
-            </p>
-          )}
-        </div>
-        <button
-          onClick={startQuiz} disabled={!validAge}
-          style={{
-            width: "100%", padding: "18px", borderRadius: "20px", border: "none",
-            background: validAge
-              ? `linear-gradient(135deg, ${groupColors[validAge].p}, ${validAge === "5-7" ? "#FF8C42" : validAge === "8-10" ? "#FF6B9D" : "#7C3AED"})`
-              : "#E0E0E0",
-            color: "white", fontSize: "20px", cursor: validAge ? "pointer" : "not-allowed",
-            fontFamily: "inherit", boxShadow: validAge ? "0 8px 24px rgba(0,0,0,0.15)" : "none",
-            transition: "transform 0.1s",
-          }}
-          onMouseEnter={e => validAge && (e.currentTarget.style.transform = "scale(1.02)")}
-          onMouseLeave={e => (e.currentTarget.style.transform = "scale(1)")}
-        >시작하기 🚀</button>
-        <div style={{ display: "flex", justifyContent: "center", gap: "20px", marginTop: "20px" }}>
-          {Object.entries(ageLabels).map(([g, v]) => (
-            <div key={g} style={{ textAlign: "center", fontSize: "13px", color: "#BBB" }}>
-              <div>{v.emoji}</div><div>{v.label}</div>
-            </div>
+        <p style={{ textAlign: "center", color: "#666", fontSize: "16px", marginBottom: "16px", fontWeight: 700 }}>몇 살이에요? 🎂</p>
+        <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+          {Object.entries(THEMES).map(([g, t]) => (
+            <button
+              key={g}
+              onClick={() => startQuiz(g)}
+              style={{
+                display: "flex", alignItems: "center", gap: "14px",
+                padding: "18px 22px", borderRadius: "22px", border: "none",
+                background: t.btnGrad, color: "white",
+                fontFamily: "inherit", fontSize: "19px", fontWeight: 700,
+                cursor: "pointer", textAlign: "left",
+                boxShadow: `0 10px 26px ${t.primary}40`,
+                transition: "transform 0.15s ease",
+              }}
+              onMouseEnter={e => (e.currentTarget.style.transform = "translateY(-3px)")}
+              onMouseLeave={e => (e.currentTarget.style.transform = "translateY(0)")}
+            >
+              <span style={{ fontSize: "38px", lineHeight: 1 }}>{t.emoji}</span>
+              <div style={{ flex: 1 }}>
+                <div>{t.label}</div>
+                <div style={{ fontSize: "12px", fontWeight: 400, opacity: 0.9, marginTop: "3px", fontFamily: '"Nanum Gothic", sans-serif' }}>{t.subtitle}</div>
+              </div>
+              <span style={{ fontSize: "22px" }}>→</span>
+            </button>
           ))}
         </div>
+        <p style={{ textAlign: "center", color: "#CCC", fontSize: "12px", margin: "20px 0 0", fontFamily: '"Nanum Gothic", sans-serif' }}>나이대마다 다른 문항으로 진행돼요</p>
       </div>
     </div>
   );
@@ -532,66 +563,101 @@ export default function ChildMBTI() {
   // ── 퀴즈 화면 ──
   if (screen === "quiz") {
     const q = questions[currentQ];
-    const c = groupColors[ageGroup];
-    const bigFont = ageGroup === "5-7";
+    const t = theme;
+    const iconSize = totalQ <= 8 ? 22 : totalQ <= 12 ? 18 : 13;
+    const iconGap = totalQ <= 8 ? 6 : totalQ <= 12 ? 4 : 3;
     return (
       <div style={wrap}>
         <div style={card}>
-          <div style={{ marginBottom: "24px" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
-              <span style={{ fontSize: "14px", color: "#CCC", fontFamily: '"Nanum Gothic", sans-serif' }}>{currentQ + 1} / {totalQ}</span>
-              <span style={{ fontSize: "13px", color: c.p, fontWeight: "700", fontFamily: '"Nanum Gothic", sans-serif' }}>{Math.round(progress)}%</span>
+          {/* 진행 인디케이터 — 별/하트/도트 */}
+          <div style={{ marginBottom: "26px" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
+              <span style={{ fontSize: "13px", color: "#BBB", fontFamily: '"Nanum Gothic", sans-serif' }}>{currentQ + 1} / {totalQ}</span>
+              <span style={{ fontSize: "13px", color: t.primary, fontWeight: 800, fontFamily: '"Nanum Gothic", sans-serif' }}>{Math.round(progress)}%</span>
             </div>
-            <div style={{ height: "10px", background: "#F0F0F0", borderRadius: "5px", overflow: "hidden" }}>
-              <div style={{
-                height: "100%", width: `${progress}%`,
-                background: `linear-gradient(90deg, ${c.p}, ${ageGroup === "5-7" ? "#FF8C42" : ageGroup === "8-10" ? "#FF6B9D" : "#7C3AED"})`,
-                borderRadius: "5px", transition: "width 0.4s ease",
-              }} />
+            <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "center", gap: `${iconGap}px`, padding: "4px 0" }}>
+              {Array.from({ length: totalQ }).map((_, i) => {
+                const done = i < currentQ;
+                const current = i === currentQ;
+                return (
+                  <span key={i} style={{
+                    fontSize: `${iconSize}px`,
+                    color: done ? t.primary : current ? t.secondary : "#E5E5E5",
+                    transform: current ? "scale(1.25)" : "scale(1)",
+                    transition: "all 0.3s ease",
+                    lineHeight: 1,
+                    display: "inline-block",
+                  }}>{done || current ? t.progressIcon : t.progressEmpty}</span>
+                );
+              })}
             </div>
           </div>
-          <div className={qVisible ? "slide-up" : ""} style={{
-            textAlign: "center", padding: "28px 20px", background: c.bg, borderRadius: "20px", marginBottom: "20px",
-            opacity: qVisible ? 1 : 0, transition: "opacity 0.2s",
-          }}>
-            <p style={{ fontSize: bigFont ? "21px" : "18px", color: "#333", margin: 0, lineHeight: 1.7, fontWeight: "700" }}>{q.text}</p>
+
+          {/* 질문 카드 — 슬라이드 애니메이션 */}
+          <div key={currentQ} className={slideDir === "prev" ? "slide-prev" : "slide-next"}>
+            <div style={{
+              textAlign: "center", padding: "32px 22px",
+              background: `linear-gradient(135deg, ${t.bg} 0%, ${t.softBg} 100%)`,
+              borderRadius: "24px", marginBottom: "22px",
+              border: `1.5px solid ${t.primary}15`,
+            }}>
+              <p style={{ fontSize: t.qFontSize, color: "#2D2D2D", margin: 0, lineHeight: 1.6, fontWeight: 800 }}>{q.text}</p>
+            </div>
+
+            {/* 선택지 — 한 화면 하나에 집중 */}
+            <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+              {[
+                { label: q.a, ch: "A" },
+                { label: q.b, ch: "B" },
+                { label: "잘 모르겠어요 🤔", ch: "C" },
+              ].map(({ label, ch }) => {
+                const isTapped = tappedCh === ch;
+                return (
+                  <button key={ch} onClick={() => handleAnswer(ch)}
+                    className={isTapped ? "tap-pop" : ""}
+                    style={{
+                      padding: "18px 20px",
+                      borderRadius: "18px",
+                      border: `2px solid ${isTapped ? t.primary : t.primary + "25"}`,
+                      background: isTapped ? t.bg : "white",
+                      fontSize: t.choiceFontSize,
+                      color: isTapped ? t.primary : "#3A3A3A",
+                      fontWeight: isTapped ? 800 : 600,
+                      cursor: "pointer", textAlign: "left",
+                      fontFamily: "inherit", lineHeight: 1.55,
+                      transition: "all 0.15s ease",
+                      boxShadow: isTapped ? `0 10px 28px ${t.primary}40` : "none",
+                    }}
+                    onMouseEnter={e => {
+                      if (isTapped) return;
+                      e.currentTarget.style.background = t.bg;
+                      e.currentTarget.style.borderColor = t.primary;
+                      e.currentTarget.style.transform = "translateY(-2px)";
+                      e.currentTarget.style.boxShadow = `0 6px 20px ${t.primary}25`;
+                    }}
+                    onMouseLeave={e => {
+                      if (isTapped) return;
+                      e.currentTarget.style.background = "white";
+                      e.currentTarget.style.borderColor = `${t.primary}25`;
+                      e.currentTarget.style.transform = "translateY(0)";
+                      e.currentTarget.style.boxShadow = "none";
+                    }}
+                  >{label}</button>
+                );
+              })}
+            </div>
           </div>
-          <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-            {[
-              { label: q.a, ch: "A" },
-              { label: q.b, ch: "B" },
-              { label: "잘 모르겠어요 🤔", ch: "C" },
-            ].map(({ label, ch }) => (
-              <button key={ch} onClick={() => handleAnswer(ch)} style={{
-                padding: "18px 20px",
-                borderRadius: "18px",
-                border: `2px solid ${c.p}25`,
-                background: "white",
-                fontSize: bigFont ? "17px" : "15px",
-                color: "#444",
-                cursor: "pointer", textAlign: "left",
-                fontFamily: "inherit", lineHeight: 1.6,
-                transition: "all 0.15s ease",
-              }}
-                onMouseEnter={e => {
-                  e.currentTarget.style.background = c.bg; e.currentTarget.style.borderColor = c.p; e.currentTarget.style.transform = "translateY(-2px)"; e.currentTarget.style.boxShadow = `0 6px 20px ${c.p}25`;
-                }}
-                onMouseLeave={e => {
-                  e.currentTarget.style.background = "white"; e.currentTarget.style.borderColor = `${c.p}25`; e.currentTarget.style.transform = "translateY(0)"; e.currentTarget.style.boxShadow = "none";
-                }}
-              >{label}</button>
-            ))}
-          </div>
+
+          {/* 이전 문항 */}
           {currentQ > 0 && (
-            <div style={{ textAlign: "center", marginTop: "18px" }}>
+            <div style={{ textAlign: "center", marginTop: "20px" }}>
               <button onClick={handleBack} style={{
-                padding: "8px 16px", borderRadius: "12px", border: "none",
+                padding: "8px 18px", borderRadius: "14px", border: "none",
                 background: "transparent", color: "#999",
-                fontSize: bigFont ? "14px" : "13px",
-                cursor: "pointer", fontFamily: "inherit",
+                fontSize: "13px", cursor: "pointer", fontFamily: "inherit",
                 transition: "color 0.15s ease",
               }}
-                onMouseEnter={e => { e.currentTarget.style.color = "#555"; }}
+                onMouseEnter={e => { e.currentTarget.style.color = t.primary; }}
                 onMouseLeave={e => { e.currentTarget.style.color = "#999"; }}
               >← 이전 문항으로 돌아가기</button>
             </div>
@@ -602,25 +668,80 @@ export default function ChildMBTI() {
   }
 
   // ── 결과 화면 ──
-  if (screen === "result" && char && pdata) return (
+  if (screen === "result" && char && pdata) {
+    const t = theme || THEMES["8-10"];
+
+    // 1단계: 큰 동물 리빌 (한 화면에 하나만 집중)
+    if (resultStep === "reveal") return (
+      <div style={wrap}>
+        <div style={{ ...card, padding: "48px 28px", textAlign: "center" }} className="pop-big">
+          <div style={{ fontSize: "13px", color: "#BBB", marginBottom: "10px", fontFamily: '"Nanum Gothic", sans-serif', letterSpacing: "1px" }}>나는…</div>
+          <div style={{
+            width: "200px", height: "200px", borderRadius: "50%",
+            background: `linear-gradient(135deg, ${char.bg} 0%, ${t.softBg} 100%)`,
+            display: "flex", alignItems: "center", justifyContent: "center",
+            fontSize: "120px", margin: "0 auto 24px",
+            boxShadow: `0 20px 48px ${char.color}35, inset 0 0 0 6px white`,
+          }} className="emoji-bounce-big">{char.emoji}</div>
+          <span style={{
+            display: "inline-block", padding: "6px 18px", borderRadius: "24px",
+            background: char.bg, color: char.color, fontSize: "15px", fontWeight: 800,
+            marginBottom: "14px", letterSpacing: "3px",
+          }}>{result}</span>
+          <h2 style={{ fontSize: "36px", color: char.color, margin: "0 0 6px", letterSpacing: "-0.5px" }}>{char.name}형</h2>
+          <p style={{ color: "#888", fontSize: "16px", margin: "0 0 36px", fontWeight: 600 }}>{char.tag}</p>
+          <button onClick={() => setResultStep("details")}
+            style={{
+              padding: "18px 36px", borderRadius: "20px", border: "none",
+              background: t.btnGrad, color: "white",
+              fontSize: "18px", fontWeight: 700, cursor: "pointer", fontFamily: "inherit",
+              boxShadow: `0 10px 28px ${t.primary}50`,
+              transition: "transform 0.15s",
+            }}
+            onMouseEnter={e => (e.currentTarget.style.transform = "translateY(-2px)")}
+            onMouseLeave={e => (e.currentTarget.style.transform = "translateY(0)")}
+          >나에 대해 더 알아보기 →</button>
+        </div>
+      </div>
+    );
+
+    // 2단계: 상세 + 부모 가이드
+    return (
     <div style={{ ...wrap, alignItems: "flex-start", paddingTop: "32px", paddingBottom: "40px" }}>
       <div style={{ ...card, maxWidth: "500px" }} className="pop">
 
-        {/* 아이 결과 */}
-        <div style={{ textAlign: "center", marginBottom: "28px" }}>
+        <div style={{ marginBottom: "12px" }}>
+          <button onClick={() => setResultStep("reveal")} style={{
+            padding: "6px 12px", borderRadius: "10px", border: "none",
+            background: "transparent", color: "#AAA",
+            fontSize: "13px", cursor: "pointer", fontFamily: "inherit",
+          }}
+            onMouseEnter={e => { e.currentTarget.style.color = char.color; }}
+            onMouseLeave={e => { e.currentTarget.style.color = "#AAA"; }}
+          >← 결과로</button>
+        </div>
+
+        {/* 아이 결과 — 컴팩트 헤더 */}
+        <div style={{ textAlign: "center", marginBottom: "24px" }}>
           <div style={{
-            width: "120px", height: "120px", borderRadius: "50%", background: char.bg,
-            display: "flex", alignItems: "center", justifyContent: "center", fontSize: "68px",
-            margin: "0 auto 16px", boxShadow: `0 12px 32px ${char.color}30`,
+            width: "100px", height: "100px", borderRadius: "50%", background: char.bg,
+            display: "flex", alignItems: "center", justifyContent: "center", fontSize: "60px",
+            margin: "0 auto 14px", boxShadow: `0 12px 32px ${char.color}30`,
           }} className="emoji-bounce">{char.emoji}</div>
           <span style={{
             display: "inline-block", padding: "5px 14px", borderRadius: "20px",
-            background: char.bg, color: char.color, fontSize: "14px", fontWeight: "800",
-            marginBottom: "10px", letterSpacing: "2px",
+            background: char.bg, color: char.color, fontSize: "14px", fontWeight: 800,
+            marginBottom: "8px", letterSpacing: "2px",
           }}>{result}</span>
-          <h2 style={{ fontSize: "30px", color: char.color, margin: "0 0 4px" }}>{char.name}형</h2>
-          <p style={{ color: "#AAA", fontSize: "15px", margin: "0 0 20px" }}>{char.tag}</p>
-          <div style={{ background: char.bg, borderRadius: "20px", padding: "20px 24px", fontSize: "16px", color: "#555", lineHeight: 1.9, whiteSpace: "pre-line" }}>
+          <h2 style={{ fontSize: "26px", color: char.color, margin: "0 0 4px" }}>{char.name}형</h2>
+          <p style={{ color: "#AAA", fontSize: "14px", margin: "0 0 18px" }}>{char.tag}</p>
+          <div style={{
+            background: `linear-gradient(135deg, ${char.bg} 0%, ${t.softBg} 100%)`,
+            borderRadius: "20px", padding: "22px 24px",
+            fontSize: "16px", color: "#444", lineHeight: 2,
+            whiteSpace: "pre-line", textAlign: "left",
+            fontWeight: 600,
+          }}>
             {CHILD_DESC[result]}
           </div>
         </div>
@@ -774,7 +895,8 @@ export default function ChildMBTI() {
         >처음으로 돌아가기 🔄</button>
       </div>
     </div>
-  );
+    );
+  }
 
   return null;
 }
