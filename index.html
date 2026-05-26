@@ -338,6 +338,7 @@ function ChildMBTI() {
   const [ageGroup, setAgeGroup] = useState(null);
   const [currentQ, setCurrentQ] = useState(0);
   const [scores, setScores] = useState({ E: 0, I: 0, S: 0, N: 0, T: 0, F: 0, J: 0, P: 0 });
+  const [answerHistory, setAnswerHistory] = useState([]);
   const [result, setResult] = useState(null);
   const [qVisible, setQVisible] = useState(true);
 
@@ -394,6 +395,7 @@ function ChildMBTI() {
     if (!g) return;
     setAgeGroup(g);
     setScores({ E: 0, I: 0, S: 0, N: 0, T: 0, F: 0, J: 0, P: 0 });
+    setAnswerHistory([]);
     setCurrentQ(0);
     setScreen("quiz");
   }
@@ -402,11 +404,13 @@ function ChildMBTI() {
     const q = questions[currentQ];
     // "C" = 잘 모르겠어요 → 중립 처리 (점수 미반영)
     let ns = scores;
+    let scoredKey = null;
     if (choice !== "C") {
-      const key = choice === "A" ? q.sa : q.sb;
-      ns = { ...scores, [key]: scores[key] + 1 };
+      scoredKey = choice === "A" ? q.sa : q.sb;
+      ns = { ...scores, [scoredKey]: scores[scoredKey] + 1 };
       setScores(ns);
     }
+    setAnswerHistory([...answerHistory, { choice, key: scoredKey }]);
     if (currentQ + 1 >= totalQ) {
       setResult(calcMBTI(ns));
       setParentStep("locked");
@@ -419,6 +423,17 @@ function ChildMBTI() {
       setQVisible(false);
       setTimeout(() => { setCurrentQ(currentQ + 1); setQVisible(true); }, 250);
     }
+  }
+
+  function handleBack() {
+    if (currentQ === 0 || answerHistory.length === 0) return;
+    const last = answerHistory[answerHistory.length - 1];
+    if (last.key) {
+      setScores({ ...scores, [last.key]: scores[last.key] - 1 });
+    }
+    setAnswerHistory(answerHistory.slice(0, -1));
+    setQVisible(false);
+    setTimeout(() => { setCurrentQ(currentQ - 1); setQVisible(true); }, 250);
   }
 
   function handleSlider(e) {
@@ -463,6 +478,7 @@ function ChildMBTI() {
     clearTimeout(timerRef.current);
     setScreen("welcome"); setAgeInput(""); setAgeGroup(null);
     setCurrentQ(0); setScores({ E: 0, I: 0, S: 0, N: 0, T: 0, F: 0, J: 0, P: 0 });
+    setAnswerHistory([]);
     setResult(null); setParentStep("locked"); setSliderVal(0);
     setQuiz(null); setQuizInput(""); setQuizErr(false); setTimer(null);
   }
@@ -567,33 +583,44 @@ function ChildMBTI() {
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
             {[
-              { label: q.a, ch: "A", neutral: false },
-              { label: q.b, ch: "B", neutral: false },
-              { label: "잘 모르겠어요 🤔", ch: "C", neutral: true },
-            ].map(({ label, ch, neutral }) => (
+              { label: q.a, ch: "A" },
+              { label: q.b, ch: "B" },
+              { label: "잘 모르겠어요 🤔", ch: "C" },
+            ].map(({ label, ch }) => (
               <button key={ch} onClick={() => handleAnswer(ch)} style={{
-                padding: neutral ? "14px 20px" : "18px 20px",
+                padding: "18px 20px",
                 borderRadius: "18px",
-                border: neutral ? `1.5px dashed #CCC` : `2px solid ${c.p}25`,
-                background: neutral ? "#FAFAFA" : "white",
-                fontSize: bigFont ? (neutral ? "15px" : "17px") : (neutral ? "14px" : "15px"),
-                color: neutral ? "#888" : "#444",
-                cursor: "pointer", textAlign: neutral ? "center" : "left",
+                border: `2px solid ${c.p}25`,
+                background: "white",
+                fontSize: bigFont ? "17px" : "15px",
+                color: "#444",
+                cursor: "pointer", textAlign: "left",
                 fontFamily: "inherit", lineHeight: 1.6,
                 transition: "all 0.15s ease",
-                marginTop: neutral ? "4px" : "0",
               }}
                 onMouseEnter={e => {
-                  if (neutral) { e.currentTarget.style.background = "#F0F0F0"; e.currentTarget.style.borderColor = "#999"; e.currentTarget.style.color = "#555"; }
-                  else { e.currentTarget.style.background = c.bg; e.currentTarget.style.borderColor = c.p; e.currentTarget.style.transform = "translateY(-2px)"; e.currentTarget.style.boxShadow = `0 6px 20px ${c.p}25`; }
+                  e.currentTarget.style.background = c.bg; e.currentTarget.style.borderColor = c.p; e.currentTarget.style.transform = "translateY(-2px)"; e.currentTarget.style.boxShadow = `0 6px 20px ${c.p}25`;
                 }}
                 onMouseLeave={e => {
-                  if (neutral) { e.currentTarget.style.background = "#FAFAFA"; e.currentTarget.style.borderColor = "#CCC"; e.currentTarget.style.color = "#888"; }
-                  else { e.currentTarget.style.background = "white"; e.currentTarget.style.borderColor = `${c.p}25`; e.currentTarget.style.transform = "translateY(0)"; e.currentTarget.style.boxShadow = "none"; }
+                  e.currentTarget.style.background = "white"; e.currentTarget.style.borderColor = `${c.p}25`; e.currentTarget.style.transform = "translateY(0)"; e.currentTarget.style.boxShadow = "none";
                 }}
               >{label}</button>
             ))}
           </div>
+          {currentQ > 0 && (
+            <div style={{ textAlign: "center", marginTop: "18px" }}>
+              <button onClick={handleBack} style={{
+                padding: "8px 16px", borderRadius: "12px", border: "none",
+                background: "transparent", color: "#999",
+                fontSize: bigFont ? "14px" : "13px",
+                cursor: "pointer", fontFamily: "inherit",
+                transition: "color 0.15s ease",
+              }}
+                onMouseEnter={e => { e.currentTarget.style.color = "#555"; }}
+                onMouseLeave={e => { e.currentTarget.style.color = "#999"; }}
+              >← 이전 문항으로 돌아가기</button>
+            </div>
+          )}
         </div>
       </div>
     );
