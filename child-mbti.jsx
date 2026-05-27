@@ -365,7 +365,7 @@ export default function ChildMBTI() {
 
     // Kakao SDK 초기화
     if (window.Kakao && !window.Kakao.isInitialized()) {
-      window.Kakao.init("5891618b5bd41967c6c1c2c7eddd1a20");
+      window.Kakao.init("fef83dd39740084a58f68fbdf626d2e0");
     }
 
     // og:url / og:image 를 현재 호스트 + ?go=1 로 동기화
