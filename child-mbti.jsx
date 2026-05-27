@@ -317,7 +317,50 @@ export default function ChildMBTI() {
       button:active { transform: scale(0.97); }
     `;
     document.head.appendChild(style);
+
+    // Kakao SDK 초기화
+    if (window.Kakao && !window.Kakao.isInitialized()) {
+      window.Kakao.init("5891618b5bd41967c6c1c2c7eddd1a20");
+    }
   }, []);
+
+  // ── 카카오 공유 ──
+  function getShareUrl() {
+    const url = window.location.href.split("?")[0].split("#")[0];
+    return url;
+  }
+  function kakaoShareTest() {
+    if (!window.Kakao?.isInitialized()) { alert("카카오 SDK 로딩 중이에요. 잠시 후 다시 시도해 주세요."); return; }
+    const u = getShareUrl();
+    window.Kakao.Share.sendDefault({
+      objectType: "text",
+      text: "🌟 우리 아이 MBTI 해봐!\n5~13세 아이의 성격을 16가지 동물 캐릭터로 알려줘요 🐣",
+      link: { mobileWebUrl: u, webUrl: u },
+      buttonTitle: "테스트 하러 가기",
+    });
+  }
+  function kakaoShareChild() {
+    if (!window.Kakao?.isInitialized() || !char) { alert("카카오 SDK 로딩 중이에요. 잠시 후 다시 시도해 주세요."); return; }
+    const oneLine = (CHILD_DESC[result] || "").split("\n").slice(0, 2).join(" ");
+    const u = getShareUrl();
+    window.Kakao.Share.sendDefault({
+      objectType: "text",
+      text: `${char.emoji} 우리 아이는 ${char.name}형 (${result})!\n${oneLine}\n\n너희 아이도 어떤 동물인지 해보자!`,
+      link: { mobileWebUrl: u, webUrl: u },
+      buttonTitle: "나도 해보기",
+    });
+  }
+  function kakaoShareFull() {
+    if (!window.Kakao?.isInitialized() || !char || !pdata) { alert("카카오 SDK 로딩 중이에요. 잠시 후 다시 시도해 주세요."); return; }
+    const oneLine = (CHILD_DESC[result] || "").split("\n").slice(0, 2).join(" ");
+    const u = getShareUrl();
+    window.Kakao.Share.sendDefault({
+      objectType: "text",
+      text: `${char.emoji} 우리 아이는 ${char.name}형 (${result})!\n${oneLine}\n\n부모 가이드까지 다 봤어요 👨‍👩‍👧 너희 아이도 해봐!`,
+      link: { mobileWebUrl: u, webUrl: u },
+      buttonTitle: "나도 해보기",
+    });
+  }
 
   const [screen, setScreen] = useState("welcome");
   const [ageInput, setAgeInput] = useState("");
@@ -554,7 +597,16 @@ export default function ChildMBTI() {
             </button>
           ))}
         </div>
-        <p style={{ textAlign: "center", color: "#CCC", fontSize: "12px", margin: "20px 0 0", fontFamily: '"Nanum Gothic", sans-serif' }}>나이대마다 다른 문항으로 진행돼요</p>
+        <p style={{ textAlign: "center", color: "#CCC", fontSize: "12px", margin: "20px 0 14px", fontFamily: '"Nanum Gothic", sans-serif' }}>나이대마다 다른 문항으로 진행돼요</p>
+        <button onClick={kakaoShareTest} style={{
+          width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: "8px",
+          padding: "14px 18px", borderRadius: "14px", border: "none",
+          background: "#FEE500", color: "#000000d9",
+          fontSize: "15px", fontWeight: 800, fontFamily: "inherit", cursor: "pointer",
+          boxShadow: "0 4px 12px rgba(254,229,0,0.35)",
+        }}>
+          <span style={{ fontSize: "18px" }}>💬</span> 친구에게 테스트 공유하기
+        </button>
       </div>
     </div>
   );
@@ -700,6 +752,16 @@ export default function ChildMBTI() {
             onMouseEnter={e => (e.currentTarget.style.transform = "translateY(-2px)")}
             onMouseLeave={e => (e.currentTarget.style.transform = "translateY(0)")}
           >나에 대해 더 알아보기 →</button>
+          <button onClick={kakaoShareChild} style={{
+            display: "flex", alignItems: "center", justifyContent: "center", gap: "8px",
+            margin: "16px auto 0",
+            padding: "12px 22px", borderRadius: "14px", border: "none",
+            background: "#FEE500", color: "#000000d9",
+            fontSize: "14px", fontWeight: 800, fontFamily: "inherit", cursor: "pointer",
+            boxShadow: "0 4px 12px rgba(254,229,0,0.35)",
+          }}>
+            <span style={{ fontSize: "17px" }}>💬</span> 결과 카톡으로 공유하기
+          </button>
         </div>
       </div>
     );
@@ -898,6 +960,16 @@ export default function ChildMBTI() {
                 </p>
               </div>
             ))}
+            <button onClick={kakaoShareFull} style={{
+              width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: "8px",
+              marginTop: "8px",
+              padding: "14px 18px", borderRadius: "14px", border: "none",
+              background: "#FEE500", color: "#000000d9",
+              fontSize: "15px", fontWeight: 800, fontFamily: "inherit", cursor: "pointer",
+              boxShadow: "0 4px 12px rgba(254,229,0,0.35)",
+            }}>
+              <span style={{ fontSize: "18px" }}>💬</span> 아이 + 부모 결과 공유하기
+            </button>
           </div>
         )}
 
