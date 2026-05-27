@@ -297,6 +297,51 @@ function calcMBTI(s) {
   return (s.E >= s.I ? "E" : "I") + (s.S >= s.N ? "S" : "N") + (s.T >= s.F ? "T" : "F") + (s.J >= s.P ? "J" : "P");
 }
 
+// 이미지 저장 헬퍼
+const KO_FONT = '"Apple SD Gothic Neo", "Jua", "Nanum Gothic", system-ui, sans-serif';
+const EMOJI_FONT = '"Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif';
+function drawRoundRect(ctx, x, y, w, h, r) {
+  if (typeof ctx.roundRect === "function") {
+    ctx.beginPath();
+    ctx.roundRect(x, y, w, h, r);
+    return;
+  }
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y, x + w, y + h, r);
+  ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r);
+  ctx.arcTo(x, y, x + w, y, r);
+  ctx.closePath();
+}
+function wrapKoText(ctx, text, maxWidth) {
+  const out = [];
+  for (const block of text.split("\n")) {
+    let line = "";
+    for (const ch of block) {
+      const test = line + ch;
+      if (ctx.measureText(test).width > maxWidth && line) {
+        out.push(line);
+        line = ch;
+      } else {
+        line = test;
+      }
+    }
+    if (line) out.push(line);
+  }
+  return out;
+}
+function downloadCanvas(canvas, filename) {
+  canvas.toBlob(blob => {
+    if (!blob) { alert("이미지 생성에 실패했어요."); return; }
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = filename;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }, "image/png");
+}
+
 const usedIdxRef = { current: new Set() };
 function getRandomQuiz() {
   if (usedIdxRef.current.size >= QUIZ_POOL.length) usedIdxRef.current.clear();
@@ -391,6 +436,190 @@ function ChildMBTI() {
       link: { mobileWebUrl: u, webUrl: u },
       buttonTitle: "나도 해보기",
     });
+  }
+
+  // ── 이미지 저장 ──
+  async function saveChildImage() {
+    if (!char) return;
+    if (document.fonts?.ready) { try { await document.fonts.ready; } catch {} }
+    const canvas = document.createElement("canvas");
+    canvas.width = 1080; canvas.height = 1080;
+    const ctx = canvas.getContext("2d");
+    const t = theme || THEMES["8-10"];
+
+    // 배경 그라데이션
+    const bg = ctx.createLinearGradient(0, 0, 0, 1080);
+    bg.addColorStop(0, t.softBg);
+    bg.addColorStop(1, char.bg);
+    ctx.fillStyle = bg;
+    ctx.fillRect(0, 0, 1080, 1080);
+
+    // 헤더
+    ctx.font = `700 36px ${KO_FONT}`;
+    ctx.fillStyle = "#888888cc";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "top";
+    ctx.fillText("어린이 MBTI", 540, 70);
+
+    // 캐릭터 원
+    ctx.beginPath();
+    ctx.arc(540, 380, 210, 0, Math.PI * 2);
+    ctx.fillStyle = "#ffffff";
+    ctx.fill();
+
+    // 이모지
+    ctx.font = `230px ${EMOJI_FONT}`;
+    ctx.textBaseline = "middle";
+    ctx.fillStyle = "#000";
+    ctx.fillText(char.emoji, 540, 385);
+
+    // MBTI 배지
+    ctx.font = `800 38px ${KO_FONT}`;
+    const codeW = ctx.measureText(result).width + 70;
+    const codeH = 62;
+    drawRoundRect(ctx, 540 - codeW/2, 640, codeW, codeH, 31);
+    ctx.fillStyle = "#ffffff";
+    ctx.fill();
+    ctx.fillStyle = char.color;
+    ctx.textBaseline = "middle";
+    ctx.fillText(result, 540, 640 + codeH/2);
+
+    // 동물 이름
+    ctx.font = `800 96px ${KO_FONT}`;
+    ctx.fillStyle = char.color;
+    ctx.textBaseline = "top";
+    ctx.fillText(`${char.name}형`, 540, 740);
+
+    // 태그
+    ctx.font = `600 38px ${KO_FONT}`;
+    ctx.fillStyle = "#666";
+    ctx.fillText(char.tag, 540, 855);
+
+    // 한줄 설명 (첫 문단)
+    const desc = (CHILD_DESC[result] || "").split("\n\n")[0];
+    ctx.font = `600 30px ${KO_FONT}`;
+    ctx.fillStyle = "#444";
+    let dy = 935;
+    for (const line of desc.split("\n")) {
+      ctx.fillText(line, 540, dy);
+      dy += 46;
+    }
+
+    // 푸터
+    ctx.font = `400 22px ${KO_FONT}`;
+    ctx.fillStyle = "#999";
+    ctx.fillText(window.location.host, 540, 1035);
+
+    downloadCanvas(canvas, `어린이MBTI_${result}_${char.name}형.png`);
+  }
+
+  async function saveFullImage() {
+    if (!char || !pdata) return;
+    if (document.fonts?.ready) { try { await document.fonts.ready; } catch {} }
+    const canvas = document.createElement("canvas");
+    canvas.width = 1080; canvas.height = 1920;
+    const ctx = canvas.getContext("2d");
+    const t = theme || THEMES["8-10"];
+
+    // 배경
+    const bg = ctx.createLinearGradient(0, 0, 0, 1920);
+    bg.addColorStop(0, t.softBg);
+    bg.addColorStop(0.35, char.bg);
+    bg.addColorStop(1, "#ffffff");
+    ctx.fillStyle = bg;
+    ctx.fillRect(0, 0, 1080, 1920);
+
+    // 헤더
+    ctx.font = `700 32px ${KO_FONT}`;
+    ctx.fillStyle = "#888888cc";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "top";
+    ctx.fillText("어린이 MBTI · 부모 가이드", 540, 70);
+
+    // 캐릭터 원 (작게)
+    ctx.beginPath();
+    ctx.arc(540, 280, 140, 0, Math.PI * 2);
+    ctx.fillStyle = "#ffffff";
+    ctx.fill();
+
+    // 이모지
+    ctx.font = `160px ${EMOJI_FONT}`;
+    ctx.textBaseline = "middle";
+    ctx.fillStyle = "#000";
+    ctx.fillText(char.emoji, 540, 285);
+
+    // MBTI 배지
+    ctx.font = `800 30px ${KO_FONT}`;
+    const codeW = ctx.measureText(result).width + 56;
+    drawRoundRect(ctx, 540 - codeW/2, 445, codeW, 52, 26);
+    ctx.fillStyle = "#ffffff"; ctx.fill();
+    ctx.fillStyle = char.color;
+    ctx.textBaseline = "middle";
+    ctx.fillText(result, 540, 471);
+
+    // 동물 이름
+    ctx.font = `800 72px ${KO_FONT}`;
+    ctx.fillStyle = char.color;
+    ctx.textBaseline = "top";
+    ctx.fillText(`${char.name}형`, 540, 520);
+
+    // 태그
+    ctx.font = `600 30px ${KO_FONT}`;
+    ctx.fillStyle = "#666";
+    ctx.fillText(char.tag, 540, 615);
+
+    // 부모 가이드 섹션 타이틀
+    ctx.font = `800 38px ${KO_FONT}`;
+    ctx.fillStyle = "#333";
+    ctx.fillText("부모님을 위한 가이드", 540, 700);
+
+    // 5개 섹션
+    const sections = [
+      { icon: "🧠", title: "심리적 특성", text: pdata.psychology, color: "#5B5FFF", bg: "#EEF0FF" },
+      { icon: "🎯", title: "훈육법",     text: pdata.discipline,  color: "#FF6B6B", bg: "#FFF0F0" },
+      { icon: "⭐", title: "칭찬법",     text: pdata.praise,      color: "#FF8C42", bg: "#FFF5EC" },
+      { icon: "📚", title: "학습 스타일", text: pdata.learning,    color: "#4361EE", bg: "#EEF1FF" },
+      { icon: "👫", title: "친구 관계",   text: pdata.relationship,color: "#4D8B31", bg: "#F0F8E8" },
+    ];
+
+    const secX = 60, secW = 960, secH = 218, secGap = 10;
+    let secY = 780;
+    for (const sec of sections) {
+      // 배경
+      drawRoundRect(ctx, secX, secY, secW, secH, 24);
+      ctx.fillStyle = sec.bg; ctx.fill();
+      // 좌측 강조 바
+      ctx.fillStyle = sec.color;
+      ctx.fillRect(secX, secY, 7, secH);
+      // 아이콘
+      ctx.font = `38px ${EMOJI_FONT}`;
+      ctx.textAlign = "left";
+      ctx.textBaseline = "top";
+      ctx.fillStyle = "#000";
+      ctx.fillText(sec.icon, secX + 32, secY + 26);
+      // 제목
+      ctx.font = `800 32px ${KO_FONT}`;
+      ctx.fillStyle = sec.color;
+      ctx.fillText(sec.title, secX + 90, secY + 30);
+      // 본문 (3줄까지)
+      ctx.font = `400 24px ${KO_FONT}`;
+      ctx.fillStyle = "#444";
+      const lines = wrapKoText(ctx, sec.text || "", secW - 70).slice(0, 4);
+      let ty = secY + 92;
+      for (const line of lines) {
+        ctx.fillText(line, secX + 32, ty);
+        ty += 36;
+      }
+      secY += secH + secGap;
+    }
+
+    // 푸터
+    ctx.font = `400 22px ${KO_FONT}`;
+    ctx.fillStyle = "#999";
+    ctx.textAlign = "center";
+    ctx.fillText(window.location.host, 540, 1880);
+
+    downloadCanvas(canvas, `어린이MBTI_${result}_${char.name}형_부모가이드.png`);
   }
 
   const [screen, setScreen] = useState("welcome");
@@ -783,16 +1012,26 @@ function ChildMBTI() {
             onMouseEnter={e => (e.currentTarget.style.transform = "translateY(-2px)")}
             onMouseLeave={e => (e.currentTarget.style.transform = "translateY(0)")}
           >나에 대해 더 알아보기 →</button>
-          <button onClick={kakaoShareChild} style={{
-            display: "flex", alignItems: "center", justifyContent: "center", gap: "8px",
-            margin: "16px auto 0",
-            padding: "12px 22px", borderRadius: "14px", border: "none",
-            background: "#FEE500", color: "#000000d9",
-            fontSize: "14px", fontWeight: 800, fontFamily: "inherit", cursor: "pointer",
-            boxShadow: "0 4px 12px rgba(254,229,0,0.35)",
-          }}>
-            <span style={{ fontSize: "17px" }}>💬</span> 결과 카톡으로 공유하기
-          </button>
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "10px", marginTop: "16px" }}>
+            <button onClick={kakaoShareChild} style={{
+              display: "flex", alignItems: "center", justifyContent: "center", gap: "8px",
+              padding: "12px 22px", borderRadius: "14px", border: "none",
+              background: "#FEE500", color: "#000000d9",
+              fontSize: "14px", fontWeight: 800, fontFamily: "inherit", cursor: "pointer",
+              boxShadow: "0 4px 12px rgba(254,229,0,0.35)",
+            }}>
+              <span style={{ fontSize: "17px" }}>💬</span> 결과 카톡으로 공유하기
+            </button>
+            <button onClick={saveChildImage} style={{
+              display: "flex", alignItems: "center", justifyContent: "center", gap: "8px",
+              padding: "12px 22px", borderRadius: "14px",
+              border: `2px solid ${char.color}30`,
+              background: "white", color: char.color,
+              fontSize: "14px", fontWeight: 800, fontFamily: "inherit", cursor: "pointer",
+            }}>
+              <span style={{ fontSize: "16px" }}>📥</span> 이미지로 저장 (1080×1080)
+            </button>
+          </div>
         </div>
       </div>
     );
@@ -1000,6 +1239,16 @@ function ChildMBTI() {
               boxShadow: "0 4px 12px rgba(254,229,0,0.35)",
             }}>
               <span style={{ fontSize: "18px" }}>💬</span> 아이 + 부모 결과 공유하기
+            </button>
+            <button onClick={saveFullImage} style={{
+              width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: "8px",
+              marginTop: "10px",
+              padding: "14px 18px", borderRadius: "14px",
+              border: "2px solid #5B5FFF30",
+              background: "white", color: "#5B5FFF",
+              fontSize: "15px", fontWeight: 800, fontFamily: "inherit", cursor: "pointer",
+            }}>
+              <span style={{ fontSize: "18px" }}>📥</span> 부모 가이드 이미지로 저장 (1080×1920)
             </button>
           </div>
         )}
