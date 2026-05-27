@@ -417,13 +417,14 @@ function ChildMBTI() {
   function getShareUrl() {
     return window.location.origin + window.location.pathname + "?go=1";
   }
-  function getOgImageUrl() {
+  function getOgImageUrl(type) {
+    if (type && CHARS[type]) return window.location.origin + "/og/" + type + ".png";
     return window.location.origin + "/og-image.png";
   }
-  function kakaoShare({ title, description, buttonTitle }) {
+  function kakaoShare({ title, description, buttonTitle, type }) {
     if (!window.Kakao?.isInitialized()) { alert("카카오 SDK 로딩 중이에요. 잠시 후 다시 시도해 주세요."); return; }
     const u = getShareUrl();
-    const img = getOgImageUrl();
+    const img = getOgImageUrl(type);
     window.Kakao.Share.sendDefault({
       objectType: "feed",
       content: {
@@ -451,6 +452,7 @@ function ChildMBTI() {
       title: `${char.emoji} 우리 아이는 ${char.name}형 (${result})!`,
       description: `${oneLine}\n\n너희 아이도 어떤 동물인지 해보자!`,
       buttonTitle: "나도 해보기",
+      type: result,
     });
   }
   function kakaoShareFull() {
@@ -460,6 +462,7 @@ function ChildMBTI() {
       title: `${char.emoji} 우리 아이는 ${char.name}형 (${result})!`,
       description: `${oneLine}\n\n부모 가이드까지 다 봤어요 👨‍👩‍👧 너희 아이도 해봐!`,
       buttonTitle: "나도 해보기",
+      type: result,
     });
   }
 
