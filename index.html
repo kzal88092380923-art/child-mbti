@@ -7,6 +7,8 @@
 <meta property="og:title" content="어린이 MBTI · 우리 아이는 어떤 동물?" />
 <meta property="og:description" content="5~13세 아이의 성격을 16가지 동물 캐릭터로 알려드려요" />
 <meta property="og:type" content="website" />
+<meta property="og:url" content="" />
+<meta property="og:image" content="" />
 <script crossorigin src="https://unpkg.com/react@18.3.1/umd/react.production.min.js"></script>
 <script crossorigin src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js"></script>
 <script src="https://unpkg.com/@babel/standalone@7.25.6/babel.min.js"></script>
@@ -398,42 +400,65 @@ function ChildMBTI() {
     if (window.Kakao && !window.Kakao.isInitialized()) {
       window.Kakao.init("5891618b5bd41967c6c1c2c7eddd1a20");
     }
+
+    // og:url / og:image 를 현재 호스트 + ?go=1 로 동기화
+    const shareUrl = window.location.origin + window.location.pathname + "?go=1";
+    const ogImageUrl = window.location.origin + "/og-image.png";
+    const setMeta = (prop, content) => {
+      let m = document.querySelector(`meta[property="${prop}"]`);
+      if (!m) { m = document.createElement("meta"); m.setAttribute("property", prop); document.head.appendChild(m); }
+      m.setAttribute("content", content);
+    };
+    setMeta("og:url", shareUrl);
+    setMeta("og:image", ogImageUrl);
   }, []);
 
   // ── 카카오 공유 ──
   function getShareUrl() {
-    const url = window.location.href.split("?")[0].split("#")[0];
-    return url;
+    return window.location.origin + window.location.pathname + "?go=1";
   }
-  function kakaoShareTest() {
+  function getOgImageUrl() {
+    return window.location.origin + "/og-image.png";
+  }
+  function kakaoShare({ title, description, buttonTitle }) {
     if (!window.Kakao?.isInitialized()) { alert("카카오 SDK 로딩 중이에요. 잠시 후 다시 시도해 주세요."); return; }
     const u = getShareUrl();
+    const img = getOgImageUrl();
     window.Kakao.Share.sendDefault({
-      objectType: "text",
-      text: "🌟 우리 아이 MBTI 해봐!\n5~13세 아이의 성격을 16가지 동물 캐릭터로 알려줘요 🐣",
-      link: { mobileWebUrl: u, webUrl: u },
+      objectType: "feed",
+      content: {
+        title,
+        description,
+        imageUrl: img,
+        link: { mobileWebUrl: u, webUrl: u },
+      },
+      buttons: [
+        { title: buttonTitle, link: { mobileWebUrl: u, webUrl: u } },
+      ],
+    });
+  }
+  function kakaoShareTest() {
+    kakaoShare({
+      title: "🌟 어린이 MBTI · 우리 아이는 어떤 동물?",
+      description: "우리 아이 MBTI 해봐!\n5~13세 아이의 성격을 16가지 동물 캐릭터로 알려줘요 🐣",
       buttonTitle: "테스트 하러 가기",
     });
   }
   function kakaoShareChild() {
-    if (!window.Kakao?.isInitialized() || !char) { alert("카카오 SDK 로딩 중이에요. 잠시 후 다시 시도해 주세요."); return; }
+    if (!char) return;
     const oneLine = (CHILD_DESC[result] || "").split("\n").slice(0, 2).join(" ");
-    const u = getShareUrl();
-    window.Kakao.Share.sendDefault({
-      objectType: "text",
-      text: `${char.emoji} 우리 아이는 ${char.name}형 (${result})!\n${oneLine}\n\n너희 아이도 어떤 동물인지 해보자!`,
-      link: { mobileWebUrl: u, webUrl: u },
+    kakaoShare({
+      title: `${char.emoji} 우리 아이는 ${char.name}형 (${result})!`,
+      description: `${oneLine}\n\n너희 아이도 어떤 동물인지 해보자!`,
       buttonTitle: "나도 해보기",
     });
   }
   function kakaoShareFull() {
-    if (!window.Kakao?.isInitialized() || !char || !pdata) { alert("카카오 SDK 로딩 중이에요. 잠시 후 다시 시도해 주세요."); return; }
+    if (!char || !pdata) return;
     const oneLine = (CHILD_DESC[result] || "").split("\n").slice(0, 2).join(" ");
-    const u = getShareUrl();
-    window.Kakao.Share.sendDefault({
-      objectType: "text",
-      text: `${char.emoji} 우리 아이는 ${char.name}형 (${result})!\n${oneLine}\n\n부모 가이드까지 다 봤어요 👨‍👩‍👧 너희 아이도 해봐!`,
-      link: { mobileWebUrl: u, webUrl: u },
+    kakaoShare({
+      title: `${char.emoji} 우리 아이는 ${char.name}형 (${result})!`,
+      description: `${oneLine}\n\n부모 가이드까지 다 봤어요 👨‍👩‍👧 너희 아이도 해봐!`,
       buttonTitle: "나도 해보기",
     });
   }
