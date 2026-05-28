@@ -1064,6 +1064,7 @@ export default function ChildMBTI() {
             fontSize: "16px", color: "#444", lineHeight: 2,
             whiteSpace: "pre-line", textAlign: "left",
             fontWeight: 600,
+            wordBreak: "keep-all",
           }}>
             {CHILD_DESC[result]}
           </div>
@@ -1197,7 +1198,7 @@ export default function ChildMBTI() {
                   <span style={{ fontSize: "20px" }}>🧠</span>
                   <h4 style={{ margin: 0, fontSize: "15px", color: "#5B5FFF", fontWeight: 800, letterSpacing: "-0.3px" }}>이 유형의 심리적 특성</h4>
                 </div>
-                <p style={{ margin: 0, fontSize: "14px", color: "#444", lineHeight: 1.85, fontFamily: '"Nanum Gothic", sans-serif' }}>
+                <p style={{ margin: 0, fontSize: "14px", color: "#444", lineHeight: 1.85, fontFamily: '"Nanum Gothic", sans-serif', wordBreak: "keep-all" }}>
                   {pdata.psychology}
                 </p>
               </div>
@@ -1217,7 +1218,7 @@ export default function ChildMBTI() {
                   <span style={{ fontSize: "20px" }}>{item.icon}</span>
                   <h4 style={{ margin: 0, fontSize: "16px", color: item.color, fontWeight: "800" }}>{item.title}</h4>
                 </div>
-                <p style={{ margin: 0, fontSize: "14px", color: "#555", lineHeight: 1.8, fontFamily: '"Nanum Gothic", sans-serif' }}>
+                <p style={{ margin: 0, fontSize: "14px", color: "#555", lineHeight: 1.8, fontFamily: '"Nanum Gothic", sans-serif', wordBreak: "keep-all" }}>
                   {pdata[item.key]}
                 </p>
               </div>
