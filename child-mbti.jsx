@@ -522,13 +522,13 @@ export default function ChildMBTI() {
     if (type && CHARS[type]) return SHARE_BASE_URL + "/og/" + type + ".png";
     return SHARE_BASE_URL + "/og-image.png";
   }
-  async function fallbackShare({ title, description, type }) {
-    const shareUrl = getShareUrl();
-    const text = `${title}\n${description}\n${shareUrl}`;
+  async function fallbackShare({ title, description, type, shareUrl }) {
+    const u = shareUrl || getShareUrl();
+    const text = `${title}\n${description}\n${u}`;
 
     try {
       if (navigator.share) {
-        await navigator.share({ title, text, url: shareUrl });
+        await navigator.share({ title, text, url: u });
         return true;
       }
     } catch {}
@@ -541,18 +541,18 @@ export default function ChildMBTI() {
       }
     } catch {}
 
-    window.prompt("아래 링크를 복사해 공유해 주세요.", `${shareUrl}\n${getOgImageUrl(type)}`);
+    window.prompt("아래 링크를 복사해 공유해 주세요.", `${u}\n${getOgImageUrl(type)}`);
     return false;
   }
 
   // ── 카카오 공유 ──
-  async function kakaoShare({ title, description, buttonTitle, type }) {
-    const u = getShareUrl();
+  async function kakaoShare({ title, description, buttonTitle, type, shareUrl }) {
+    const u = shareUrl || getShareUrl();
     const img = getOgImageUrl(type);
 
     try {
       if (!window.Kakao?.isInitialized?.()) {
-        await fallbackShare({ title, description, type });
+        await fallbackShare({ title, description, type, shareUrl: u });
         return;
       }
 
@@ -579,6 +579,7 @@ export default function ChildMBTI() {
       title: "🌟 어린이 MBTI · 우리 아이는 어떤 동물?",
       description: "우리 아이 MBTI 해봐!\n5~13세 아이의 성격을 16가지 동물 캐릭터로 알려줘요 🐣",
       buttonTitle: "테스트 하러 가기",
+      shareUrl: SHARE_BASE_URL,
     });
   }
   function kakaoShareChild() {
