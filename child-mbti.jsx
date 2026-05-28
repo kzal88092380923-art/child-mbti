@@ -844,10 +844,7 @@ export default function ChildMBTI() {
               onMouseLeave={e => (e.currentTarget.style.transform = "translateY(0)")}
             >
               <span style={{ fontSize: "38px", lineHeight: 1 }}>{t.emoji}</span>
-              <div style={{ flex: 1 }}>
-                <div>{t.label}</div>
-                <div style={{ fontSize: "12px", fontWeight: 400, opacity: 0.9, marginTop: "3px", fontFamily: '"Nanum Gothic", sans-serif' }}>{t.subtitle}</div>
-              </div>
+              <div style={{ flex: 1 }}>{t.label}</div>
               <span style={{ fontSize: "22px" }}>→</span>
             </button>
           ))}
