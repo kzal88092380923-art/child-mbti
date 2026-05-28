@@ -16,6 +16,9 @@
 <meta property="og:site_name" content="어린이 MBTI" />
 <meta property="og:locale" content="ko_KR" />
 <meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:image" content="https://child-mbti-preview-jh.netlify.app/og-image.png" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <!-- Google tag (gtag.js) -->
 <script async src="https://www.googletagmanager.com/gtag/js?id=G-HFQCEBY2PW"></script>
 <script>
@@ -349,6 +352,15 @@ function wrapKoText(ctx, text, maxWidth) {
   return out;
 }
 function downloadCanvas(canvas, filename) {
+  if (typeof canvas.toBlob !== "function") {
+    const a = document.createElement("a");
+    a.href = canvas.toDataURL("image/png");
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    return;
+  }
   canvas.toBlob(blob => {
     if (!blob) { alert("이미지 생성에 실패했어요."); return; }
     const url = URL.createObjectURL(blob);
@@ -368,9 +380,61 @@ function getRandomQuiz() {
   return QUIZ_POOL[idx];
 }
 
+const SHARE_BASE_URL = "https://child-mbti-preview-jh.netlify.app";
+const KAKAO_APP_KEY = "fef83dd39740084a58f68fbdf626d2e0";
+const STORAGE_KEY = "child-mbti-state-v2";
+const EMPTY_SCORES = Object.freeze({ E: 0, I: 0, S: 0, N: 0, T: 0, F: 0, J: 0, P: 0 });
+
+function createEmptyScores() {
+  return { ...EMPTY_SCORES };
+}
+
+function splitParagraphs(text) {
+  return String(text || "").split("\n\n").map(block => block.trim()).filter(Boolean);
+}
+
+function trackEvent(name, params = {}) {
+  try {
+    if (typeof window.gtag === "function") {
+      window.gtag("event", name, params);
+    }
+  } catch {}
+}
+
 // ===================== 컴포넌트 =====================
 
 function ChildMBTI() {
+  const THEMES = {
+    "5-7": {
+      primary: "#FF4D6D", secondary: "#FFB627",
+      bg: "#FFE9F0", softBg: "#FFF5F8",
+      bodyBg: "linear-gradient(135deg, #FFE5EC 0%, #FFEDD5 50%, #FFE0EC 100%)",
+      btnGrad: "linear-gradient(135deg, #FF4D6D 0%, #FFB627 100%)",
+      progressIcon: "♥", progressEmpty: "♡",
+      qFontSize: "22px", choiceFontSize: "17px",
+      label: "5~7살", emoji: "🐣",
+    },
+    "8-10": {
+      primary: "#FF6B6B", secondary: "#FFA94D",
+      bg: "#FFEDE3", softBg: "#FFF5EE",
+      bodyBg: "linear-gradient(135deg, #FFF0E5 0%, #E5F9F2 50%, #FFEDE3 100%)",
+      btnGrad: "linear-gradient(135deg, #FF6B6B 0%, #FFA94D 100%)",
+      progressIcon: "★", progressEmpty: "☆",
+      qFontSize: "20px", choiceFontSize: "16px",
+      label: "8~10살", emoji: "🌱",
+    },
+    "11-13": {
+      primary: "#5B5FFF", secondary: "#7C3AED",
+      bg: "#EEF0FF", softBg: "#F7F8FF",
+      bodyBg: "linear-gradient(135deg, #E9ECFF 0%, #F0E5FF 50%, #E2E7FF 100%)",
+      btnGrad: "linear-gradient(135deg, #5B5FFF 0%, #7C3AED 100%)",
+      progressIcon: "●", progressEmpty: "○",
+      qFontSize: "19px", choiceFontSize: "15px",
+      label: "11~13살", emoji: "🌟",
+    },
+  };
+  const DEFAULT_BG = "linear-gradient(135deg, #FFF5EC 0%, #FFF0F8 50%, #F0EFFF 100%)";
+
   useEffect(() => {
     const link = document.createElement("link");
     link.href = "https://fonts.googleapis.com/css2?family=Jua&family=Nanum+Gothic:wght@400;700;800&display=swap";
@@ -383,27 +447,39 @@ function ChildMBTI() {
         box-sizing: border-box;
         -webkit-tap-highlight-color: transparent;
       }
-      html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+      html {
+        -webkit-text-size-adjust: 100%;
+        text-size-adjust: 100%;
+        word-break: keep-all;
+        overflow-wrap: break-word;
+      }
       body {
         margin: 0;
         background: linear-gradient(135deg, #FFF5EC 0%, #FFF0F8 50%, #F0EFFF 100%);
         min-height: 100vh;
         min-height: 100dvh;
+        padding-top: constant(safe-area-inset-top);
         padding-top: env(safe-area-inset-top);
+        padding-bottom: constant(safe-area-inset-bottom);
         padding-bottom: env(safe-area-inset-bottom);
+        padding-left: constant(safe-area-inset-left);
         padding-left: env(safe-area-inset-left);
+        padding-right: constant(safe-area-inset-right);
         padding-right: env(safe-area-inset-right);
         -webkit-font-smoothing: antialiased;
         -moz-osx-font-smoothing: grayscale;
         text-rendering: optimizeLegibility;
         overscroll-behavior-y: none;
+        word-break: keep-all;
       }
+      #root { min-height: 100vh; min-height: 100dvh; }
       button {
         -webkit-appearance: none;
         appearance: none;
         touch-action: manipulation;
         -webkit-user-select: none;
         user-select: none;
+        min-height: 44px;
       }
       input, textarea {
         -webkit-appearance: none;
@@ -424,12 +500,12 @@ function ChildMBTI() {
       input[type=range]::-moz-range-thumb { width: 44px; height: 44px; border-radius: 50%; background: linear-gradient(135deg, #7C3AED, #4F46E5); border: 3px solid white; cursor: pointer; }
       @keyframes pop { 0% { transform: scale(0.8); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
       @keyframes popBig { 0% { transform: scale(0.4); opacity: 0; } 60% { transform: scale(1.1); opacity: 1; } 100% { transform: scale(1); opacity: 1; } }
-      @keyframes slideUp { 0% { transform: translateY(20px); opacity: 0; } 100% { transform: translateY(0); opacity: 1; } }
+      @keyframes slideUp { 0% { transform: translate3d(0, 20px, 0); opacity: 0; } 100% { transform: translate3d(0, 0, 0); opacity: 1; } }
       @keyframes bounce { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
       @keyframes bounceBig { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-14px); } }
-      @keyframes shake { 0%,100% { transform: translateX(0); } 25% { transform: translateX(-6px); } 75% { transform: translateX(6px); } }
-      @keyframes slideInRight { 0% { transform: translateX(40px); opacity: 0; } 100% { transform: translateX(0); opacity: 1; } }
-      @keyframes slideInLeft { 0% { transform: translateX(-40px); opacity: 0; } 100% { transform: translateX(0); opacity: 1; } }
+      @keyframes shake { 0%,100% { transform: translate3d(0, 0, 0); } 25% { transform: translate3d(-6px, 0, 0); } 75% { transform: translate3d(6px, 0, 0); } }
+      @keyframes slideInRight { 0% { transform: translate3d(40px, 0, 0); opacity: 0; } 100% { transform: translate3d(0, 0, 0); opacity: 1; } }
+      @keyframes slideInLeft { 0% { transform: translate3d(-40px, 0, 0); opacity: 0; } 100% { transform: translate3d(0, 0, 0); opacity: 1; } }
       @keyframes tapPop { 0% { transform: scale(1); } 35% { transform: scale(1.07); } 100% { transform: scale(1); } }
       @keyframes ringPulse { 0% { box-shadow: 0 0 0 0 currentColor; opacity: 0.5; } 100% { box-shadow: 0 0 0 24px transparent; opacity: 0; } }
       @keyframes fillIn { 0% { transform: scale(0); } 70% { transform: scale(1.3); } 100% { transform: scale(1); } }
@@ -438,6 +514,19 @@ function ChildMBTI() {
       .slide-up { animation: slideUp 0.3s ease both; }
       .slide-next { animation: slideInRight 0.4s cubic-bezier(0.4,0,0.2,1) both; }
       .slide-prev { animation: slideInLeft 0.4s cubic-bezier(0.4,0,0.2,1) both; }
+      .gpu-layer {
+        will-change: transform, opacity;
+        transform: translate3d(0, 0, 0);
+        -webkit-transform: translate3d(0, 0, 0);
+        backface-visibility: hidden;
+        -webkit-backface-visibility: hidden;
+        perspective: 1000px;
+        -webkit-perspective: 1000px;
+      }
+      .slide-shell {
+        touch-action: pan-y;
+        contain: layout paint;
+      }
       .emoji-bounce { animation: bounce 2s ease-in-out infinite; }
       .emoji-bounce-big { animation: bounceBig 2.4s ease-in-out infinite; }
       .shake { animation: shake 0.3s ease; }
@@ -447,47 +536,94 @@ function ChildMBTI() {
     `;
     document.head.appendChild(style);
 
-    // Kakao SDK 초기화
-    if (window.Kakao && !window.Kakao.isInitialized()) {
-      window.Kakao.init("fef83dd39740084a58f68fbdf626d2e0");
+    try {
+      if (window.Kakao && !window.Kakao.isInitialized()) {
+        window.Kakao.init(KAKAO_APP_KEY);
+      }
+    } catch (err) {
+      console.warn("Kakao init failed:", err);
     }
 
-    // og:url / og:image 를 현재 호스트 + ?go=1 로 동기화
-    const shareUrl = window.location.origin + window.location.pathname + "?go=1";
-    const ogImageUrl = window.location.origin + "/og-image.png";
+    const shareUrl = SHARE_BASE_URL + "/?go=1";
+    const ogImageUrl = SHARE_BASE_URL + "/og-image.png";
     const setMeta = (prop, content) => {
       let m = document.querySelector(`meta[property="${prop}"]`);
       if (!m) { m = document.createElement("meta"); m.setAttribute("property", prop); document.head.appendChild(m); }
       m.setAttribute("content", content);
     };
+    const setNameMeta = (name, content) => {
+      let m = document.querySelector(`meta[name="${name}"]`);
+      if (!m) { m = document.createElement("meta"); m.setAttribute("name", name); document.head.appendChild(m); }
+      m.setAttribute("content", content);
+    };
     setMeta("og:url", shareUrl);
     setMeta("og:image", ogImageUrl);
+    setNameMeta("twitter:image", ogImageUrl);
+
+    return () => {
+      link.remove();
+      style.remove();
+    };
   }, []);
 
-  // ── 카카오 공유 ──
   function getShareUrl() {
-    return window.location.origin + window.location.pathname + "?go=1";
+    return SHARE_BASE_URL + "/?go=1";
   }
   function getOgImageUrl(type) {
-    if (type && CHARS[type]) return window.location.origin + "/og/" + type + ".png";
-    return window.location.origin + "/og-image.png";
+    if (type && CHARS[type]) return SHARE_BASE_URL + "/og/" + type + ".png";
+    return SHARE_BASE_URL + "/og-image.png";
   }
-  function kakaoShare({ title, description, buttonTitle, type }) {
-    if (!window.Kakao?.isInitialized()) { alert("카카오 SDK 로딩 중이에요. 잠시 후 다시 시도해 주세요."); return; }
+  async function fallbackShare({ title, description, type }) {
+    const shareUrl = getShareUrl();
+    const text = `${title}\n${description}\n${shareUrl}`;
+
+    try {
+      if (navigator.share) {
+        await navigator.share({ title, text, url: shareUrl });
+        return true;
+      }
+    } catch {}
+
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(text);
+        alert("공유 문구와 링크를 복사했어요.");
+        return true;
+      }
+    } catch {}
+
+    window.prompt("아래 링크를 복사해 공유해 주세요.", `${shareUrl}\n${getOgImageUrl(type)}`);
+    return false;
+  }
+
+  // ── 카카오 공유 ──
+  async function kakaoShare({ title, description, buttonTitle, type }) {
     const u = getShareUrl();
     const img = getOgImageUrl(type);
-    window.Kakao.Share.sendDefault({
-      objectType: "feed",
-      content: {
-        title,
-        description,
-        imageUrl: img,
-        link: { mobileWebUrl: u, webUrl: u },
-      },
-      buttons: [
-        { title: buttonTitle, link: { mobileWebUrl: u, webUrl: u } },
-      ],
-    });
+
+    try {
+      if (!window.Kakao?.isInitialized?.()) {
+        await fallbackShare({ title, description, type });
+        return;
+      }
+
+      window.Kakao.Share.sendDefault({
+        objectType: "feed",
+        content: {
+          title,
+          description,
+          imageUrl: img,
+          link: { mobileWebUrl: u, webUrl: u },
+        },
+        buttons: [
+          { title: buttonTitle, link: { mobileWebUrl: u, webUrl: u } },
+        ],
+      });
+      trackEvent("share_kakao", { result_type: type || "test" });
+    } catch (err) {
+      console.warn("Kakao share failed:", err);
+      await fallbackShare({ title, description, type });
+    }
   }
   function kakaoShareTest() {
     kakaoShare({
@@ -705,7 +841,7 @@ function ChildMBTI() {
   const [ageInput, setAgeInput] = useState("");
   const [ageGroup, setAgeGroup] = useState(null);
   const [currentQ, setCurrentQ] = useState(0);
-  const [scores, setScores] = useState({ E: 0, I: 0, S: 0, N: 0, T: 0, F: 0, J: 0, P: 0 });
+  const [scores, setScores] = useState(createEmptyScores);
   const [answerHistory, setAnswerHistory] = useState([]);
   const [result, setResult] = useState(null);
   const [slideDir, setSlideDir] = useState("next");
@@ -722,6 +858,8 @@ function ChildMBTI() {
   const [shakeKey, setShakeKey] = useState(0);
 
   const timerRef = useRef(null);
+  const restoreRef = useRef(false);
+  const swipeStartRef = useRef(null);
 
   // 타이머 로직
   useEffect(() => {
@@ -750,56 +888,114 @@ function ChildMBTI() {
     document.body.style.transition = "background 0.6s ease";
   }, [ageGroup]);
 
+  useEffect(() => {
+    try {
+      const raw = window.localStorage.getItem(STORAGE_KEY);
+      if (!raw) {
+        restoreRef.current = true;
+        return;
+      }
+
+      const saved = JSON.parse(raw);
+      const savedAgeGroup = saved?.ageGroup && QUESTIONS[saved.ageGroup] ? saved.ageGroup : null;
+      const savedQuestions = savedAgeGroup ? QUESTIONS[savedAgeGroup] : [];
+      const savedCurrentQ = Number.isInteger(saved?.currentQ) ? Math.min(Math.max(saved.currentQ, 0), Math.max(savedQuestions.length - 1, 0)) : 0;
+      const savedResult = saved?.result && CHARS[saved.result] ? saved.result : null;
+      const savedScreen = savedResult ? saved?.screen || "result" : (savedAgeGroup ? saved?.screen || "quiz" : "welcome");
+      const savedParentStep = savedResult && ["locked", "slider", "quiz", "open"].includes(saved?.parentStep) ? saved.parentStep : "locked";
+
+      setScreen(savedScreen);
+      setAgeInput(saved?.ageInput || "");
+      setAgeGroup(savedAgeGroup);
+      setCurrentQ(savedCurrentQ);
+      setScores({ ...createEmptyScores(), ...(saved?.scores || {}) });
+      setAnswerHistory(Array.isArray(saved?.answerHistory) ? saved.answerHistory : []);
+      setResult(savedResult);
+      setSlideDir(saved?.slideDir === "prev" ? "prev" : "next");
+      setTappedCh(null);
+      setResultStep(saved?.resultStep === "details" ? "details" : "reveal");
+      setParentStep(savedParentStep);
+      setSliderVal(typeof saved?.sliderVal === "number" ? saved.sliderVal : 0);
+      setQuiz(savedParentStep === "quiz" && saved?.quiz?.q ? saved.quiz : null);
+      setQuizInput(savedParentStep === "quiz" ? saved?.quizInput || "" : "");
+      setQuizErr(false);
+      setTimer(savedParentStep === "quiz" ? 10 : null);
+    } catch (err) {
+      console.warn("State restore failed:", err);
+      window.localStorage.removeItem(STORAGE_KEY);
+    } finally {
+      restoreRef.current = true;
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!restoreRef.current) return;
+
+    const nextState = {
+      screen,
+      ageInput,
+      ageGroup,
+      currentQ,
+      scores,
+      answerHistory,
+      result,
+      slideDir,
+      resultStep,
+      parentStep,
+      sliderVal,
+      quiz,
+      quizInput,
+    };
+
+    try {
+      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(nextState));
+    } catch (err) {
+      console.warn("State persist failed:", err);
+    }
+  }, [screen, ageInput, ageGroup, currentQ, scores, answerHistory, result, slideDir, resultStep, parentStep, sliderVal, quiz, quizInput]);
+
   const questions = ageGroup ? QUESTIONS[ageGroup] : [];
   const totalQ = questions.length;
   const progress = totalQ > 0 ? (currentQ / totalQ) * 100 : 0;
-  const validAge = getAgeGroup(parseInt(ageInput));
 
-  const THEMES = {
-    "5-7": {
-      primary: "#FF4D6D", secondary: "#FFB627",
-      bg: "#FFE9F0", softBg: "#FFF5F8",
-      bodyBg: "linear-gradient(135deg, #FFE5EC 0%, #FFEDD5 50%, #FFE0EC 100%)",
-      btnGrad: "linear-gradient(135deg, #FF4D6D 0%, #FFB627 100%)",
-      progressIcon: "♥", progressEmpty: "♡",
-      qFontSize: "22px", choiceFontSize: "17px",
-      label: "5~7살", emoji: "🐣", subtitle: "원색 가득한 동물 친구들",
-    },
-    "8-10": {
-      primary: "#FF6B6B", secondary: "#FFA94D",
-      bg: "#FFEDE3", softBg: "#FFF5EE",
-      bodyBg: "linear-gradient(135deg, #FFF0E5 0%, #E5F9F2 50%, #FFEDE3 100%)",
-      btnGrad: "linear-gradient(135deg, #FF6B6B 0%, #FFA94D 100%)",
-      progressIcon: "★", progressEmpty: "☆",
-      qFontSize: "20px", choiceFontSize: "16px",
-      label: "8~10살", emoji: "🌱", subtitle: "생동감 있는 컬러",
-    },
-    "11-13": {
-      primary: "#5B5FFF", secondary: "#7C3AED",
-      bg: "#EEF0FF", softBg: "#F7F8FF",
-      bodyBg: "linear-gradient(135deg, #E9ECFF 0%, #F0E5FF 50%, #E2E7FF 100%)",
-      btnGrad: "linear-gradient(135deg, #5B5FFF 0%, #7C3AED 100%)",
-      progressIcon: "●", progressEmpty: "○",
-      qFontSize: "19px", choiceFontSize: "15px",
-      label: "11~13살", emoji: "🌟", subtitle: "세련된 톤",
-    },
-  };
-  const DEFAULT_BG = "linear-gradient(135deg, #FFF5EC 0%, #FFF0F8 50%, #F0EFFF 100%)";
   const theme = ageGroup ? THEMES[ageGroup] : null;
+
+  function handleQuestionPointerStart(e) {
+    if (e.pointerType === "mouse") return;
+    swipeStartRef.current = { x: e.clientX, y: e.clientY };
+  }
+
+  function handleQuestionPointerEnd(e) {
+    if (!swipeStartRef.current) return;
+    const deltaX = e.clientX - swipeStartRef.current.x;
+    const deltaY = e.clientY - swipeStartRef.current.y;
+    swipeStartRef.current = null;
+    if (Math.abs(deltaX) < 60 || Math.abs(deltaX) < Math.abs(deltaY) * 1.2) return;
+    if (deltaX > 0) handleBack();
+  }
 
   function startQuiz(forced) {
     const g = forced || getAgeGroup(parseInt(ageInput));
     if (!g) return;
     setAgeGroup(g);
-    setScores({ E: 0, I: 0, S: 0, N: 0, T: 0, F: 0, J: 0, P: 0 });
+    setScores(createEmptyScores());
     setAnswerHistory([]);
     setCurrentQ(0);
     setSlideDir("next");
+    setResult(null);
+    setResultStep("reveal");
+    setParentStep("locked");
+    setSliderVal(0);
+    setQuiz(null);
+    setQuizInput("");
+    setQuizErr(false);
+    setTimer(null);
     setScreen("quiz");
+    trackEvent("select_age_group", { age_group: g });
   }
 
   function handleAnswer(choice) {
-    if (tappedCh) return;
+    if (tappedCh || !questions[currentQ]) return;
     setTappedCh(choice);
     const q = questions[currentQ];
     let ns = scores;
@@ -813,7 +1009,8 @@ function ChildMBTI() {
       setAnswerHistory([...answerHistory, { choice, key: scoredKey }]);
       setTappedCh(null);
       if (currentQ + 1 >= totalQ) {
-        setResult(calcMBTI(ns));
+        const nextResult = calcMBTI(ns);
+        setResult(nextResult);
         setResultStep("reveal");
         setParentStep("locked");
         setSliderVal(0);
@@ -821,6 +1018,7 @@ function ChildMBTI() {
         setQuizInput("");
         setTimer(null);
         setScreen("result");
+        trackEvent("quiz_completed", { result_type: nextResult, age_group: ageGroup, question_count: totalQ });
       } else {
         setSlideDir("next");
         setCurrentQ(currentQ + 1);
@@ -842,7 +1040,7 @@ function ChildMBTI() {
   function handleSlider(e) {
     const v = parseInt(e.target.value);
     setSliderVal(v);
-    if (v >= 95) {
+    if (parentStep === "slider" && v >= 95) {
       setTimeout(() => {
         const q = getRandomQuiz();
         setQuiz(q);
@@ -856,6 +1054,7 @@ function ChildMBTI() {
   }
 
   function checkQuiz() {
+    if (!quiz) return;
     const normalize = s => s.trim().toLowerCase().replace(/\s/g, "").replace(/\./g, "");
     const userAns = normalize(quizInput);
     const correctAns = normalize(quiz.a);
@@ -863,6 +1062,7 @@ function ChildMBTI() {
       clearTimeout(timerRef.current);
       setParentStep("open");
       setTimer(null);
+      trackEvent("parent_unlock_success", { result_type: result || "unknown" });
     } else {
       setQuizErr(true);
       setShakeKey(k => k + 1);
@@ -880,19 +1080,43 @@ function ChildMBTI() {
   function restart() {
     clearTimeout(timerRef.current);
     setScreen("welcome"); setAgeInput(""); setAgeGroup(null);
-    setCurrentQ(0); setScores({ E: 0, I: 0, S: 0, N: 0, T: 0, F: 0, J: 0, P: 0 });
+    setCurrentQ(0); setScores(createEmptyScores());
     setAnswerHistory([]); setSlideDir("next"); setTappedCh(null); setResultStep("reveal");
     setResult(null); setParentStep("locked"); setSliderVal(0);
     setQuiz(null); setQuizInput(""); setQuizErr(false); setTimer(null);
+    window.localStorage.removeItem(STORAGE_KEY);
   }
 
   const char = result ? CHARS[result] : null;
   const pdata = result ? PARENT_DATA[result] : null;
 
+  function renderParagraphText(text, extraStyle = {}) {
+    return splitParagraphs(text).map((paragraph, idx) => (
+      <p key={idx} style={{ margin: idx === 0 ? 0 : "14px 0 0", ...extraStyle }}>
+        {paragraph}
+      </p>
+    ));
+  }
+
+  function renderTestShareButton(compact = false) {
+    return (
+      <button onClick={kakaoShareTest} style={{
+        width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: "8px",
+        padding: compact ? "12px 16px" : "14px 18px", borderRadius: "14px", border: "none",
+        background: "#FEE500", color: "#000000d9",
+        fontSize: compact ? "14px" : "15px", fontWeight: 800, fontFamily: "inherit", cursor: "pointer",
+        boxShadow: "0 4px 12px rgba(254,229,0,0.35)",
+      }}>
+        <span style={{ fontSize: compact ? "17px" : "18px" }}>💬</span> 테스트 공유하기
+      </button>
+    );
+  }
+
   const wrap = {
     fontFamily: '"Jua", "Nanum Gothic", sans-serif',
     display: "flex", alignItems: "center", justifyContent: "center",
     minHeight: "100vh", padding: "20px",
+    wordBreak: "keep-all",
   };
   const card = {
     background: "white", borderRadius: "32px", padding: "36px 32px",
@@ -933,16 +1157,9 @@ function ChildMBTI() {
             </button>
           ))}
         </div>
-        <p style={{ textAlign: "center", color: "#CCC", fontSize: "12px", margin: "20px 0 14px", fontFamily: '"Nanum Gothic", sans-serif' }}>나이대마다 다른 문항으로 진행돼요</p>
-        <button onClick={kakaoShareTest} style={{
-          width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: "8px",
-          padding: "14px 18px", borderRadius: "14px", border: "none",
-          background: "#FEE500", color: "#000000d9",
-          fontSize: "15px", fontWeight: 800, fontFamily: "inherit", cursor: "pointer",
-          boxShadow: "0 4px 12px rgba(254,229,0,0.35)",
-        }}>
-          <span style={{ fontSize: "18px" }}>💬</span> 친구에게 테스트 공유하기
-        </button>
+        <div style={{ marginTop: "18px" }}>
+          {renderTestShareButton()}
+        </div>
       </div>
     </div>
   );
@@ -981,14 +1198,20 @@ function ChildMBTI() {
           </div>
 
           {/* 질문 카드 — 슬라이드 애니메이션 */}
-          <div key={currentQ} className={slideDir === "prev" ? "slide-prev" : "slide-next"}>
+          <div
+            key={currentQ}
+            className={`slide-shell gpu-layer ${slideDir === "prev" ? "slide-prev" : "slide-next"}`}
+            onPointerDown={handleQuestionPointerStart}
+            onPointerUp={handleQuestionPointerEnd}
+            onPointerCancel={() => { swipeStartRef.current = null; }}
+          >
             <div style={{
               textAlign: "center", padding: "32px 22px",
               background: `linear-gradient(135deg, ${t.bg} 0%, ${t.softBg} 100%)`,
               borderRadius: "24px", marginBottom: "22px",
               border: `1.5px solid ${t.primary}15`,
             }}>
-              <p style={{ fontSize: t.qFontSize, color: "#2D2D2D", margin: 0, lineHeight: 1.6, fontWeight: 800 }}>{q.text}</p>
+              <p style={{ fontSize: t.qFontSize, color: "#2D2D2D", margin: 0, lineHeight: 1.6, fontWeight: 800, wordBreak: "keep-all" }}>{q.text}</p>
             </div>
 
             {/* 선택지 — 한 화면 하나에 집중 */}
@@ -1012,6 +1235,7 @@ function ChildMBTI() {
                       fontWeight: isTapped ? 800 : 600,
                       cursor: "pointer", textAlign: "left",
                       fontFamily: "inherit", lineHeight: 1.55,
+                      wordBreak: "keep-all",
                       transition: "all 0.15s ease",
                       boxShadow: isTapped ? `0 10px 28px ${t.primary}40` : "none",
                     }}
@@ -1051,16 +1275,8 @@ function ChildMBTI() {
           )}
 
           {/* 질문 페이지 하단 — 테스트 공유 */}
-          <div style={{ display: "flex", justifyContent: "center", marginTop: "18px" }}>
-            <button onClick={kakaoShareTest} style={{
-              display: "flex", alignItems: "center", justifyContent: "center", gap: "6px",
-              padding: "10px 18px", borderRadius: "12px", border: "none",
-              background: "#FEE500", color: "#000000d9",
-              fontSize: "13px", fontWeight: 800, fontFamily: "inherit", cursor: "pointer",
-              boxShadow: "0 3px 10px rgba(254,229,0,0.30)",
-            }}>
-              <span style={{ fontSize: "15px" }}>💬</span> 친구에게 테스트 공유
-            </button>
+          <div style={{ marginTop: "18px" }}>
+            {renderTestShareButton(true)}
           </div>
         </div>
       </div>
@@ -1120,6 +1336,9 @@ function ChildMBTI() {
             }}>
               <span style={{ fontSize: "16px" }}>📥</span> 이미지로 저장 (1080×1080)
             </button>
+            <div style={{ width: "100%", maxWidth: "320px" }}>
+              {renderTestShareButton(true)}
+            </div>
           </div>
         </div>
       </div>
@@ -1159,11 +1378,11 @@ function ChildMBTI() {
             background: `linear-gradient(135deg, ${char.bg} 0%, ${t.softBg} 100%)`,
             borderRadius: "20px", padding: "22px 24px",
             fontSize: "16px", color: "#444", lineHeight: 2,
-            whiteSpace: "pre-line", textAlign: "left",
+            textAlign: "left",
             fontWeight: 600,
             wordBreak: "keep-all",
           }}>
-            {CHILD_DESC[result]}
+            {renderParagraphText(CHILD_DESC[result], { lineHeight: 1.95 })}
           </div>
         </div>
 
@@ -1175,7 +1394,7 @@ function ChildMBTI() {
             <div style={{ fontSize: "36px", marginBottom: "8px" }}>🔒</div>
             <h3 style={{ fontSize: "18px", color: "#444", margin: "0 0 6px" }}>부모님 전용 가이드</h3>
             <p style={{ color: "#BBB", fontSize: "13px", margin: "0 0 20px", lineHeight: 1.6 }}>우리 아이 훈육법 · 칭찬법<br />학습 스타일 · 친구 관계</p>
-            <button onClick={() => setParentStep("slider")} style={{
+            <button onClick={() => { setParentStep("slider"); trackEvent("parent_unlock_start", { result_type: result || "unknown" }); }} style={{
               padding: "14px 32px", borderRadius: "16px", border: "none",
               background: "linear-gradient(135deg, #7C3AED, #4F46E5)",
               color: "white", fontSize: "16px", cursor: "pointer", fontFamily: "inherit",
@@ -1278,7 +1497,7 @@ function ChildMBTI() {
 
         {/* 부모 결과 공개 */}
         {parentStep === "open" && (
-          <div className="slide-up">
+          <div className="slide-up gpu-layer">
             <div style={{ textAlign: "center", marginBottom: "20px" }}>
               <div style={{ fontSize: "28px", marginBottom: "4px" }}>👨‍👩‍👧</div>
               <h3 style={{ fontSize: "20px", color: "#333", margin: "0 0 4px" }}>부모님을 위한 양육 가이드</h3>
@@ -1342,6 +1561,10 @@ function ChildMBTI() {
             </button>
           </div>
         )}
+
+        <div style={{ marginTop: "12px" }}>
+          {renderTestShareButton(true)}
+        </div>
 
         <button onClick={restart} style={{
           width: "100%", padding: "14px", borderRadius: "16px", border: "2px solid #F0F0F0",
