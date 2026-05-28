@@ -11,8 +11,8 @@
 <meta property="og:type" content="website" />
 <meta property="og:url" content="https://child-mbti-preview-jh.netlify.app/?go=1" />
 <meta property="og:image" content="https://child-mbti-preview-jh.netlify.app/og-image.png" />
-<meta property="og:image:width" content="1200" />
-<meta property="og:image:height" content="630" />
+<meta property="og:image:width" content="800" />
+<meta property="og:image:height" content="400" />
 <meta property="og:site_name" content="어린이 MBTI" />
 <meta property="og:locale" content="ko_KR" />
 <meta name="twitter:card" content="summary_large_image" />
@@ -860,6 +860,11 @@ function ChildMBTI() {
   const timerRef = useRef(null);
   const restoreRef = useRef(false);
   const swipeStartRef = useRef(null);
+  const sliderTrackRef = useRef(null);
+  const sliderDragRef = useRef(null);
+  const sliderValRef = useRef(0);
+  const [sliderDragging, setSliderDragging] = useState(false);
+  const [sliderTrackWidth, setSliderTrackWidth] = useState(280);
 
   // 타이머 로직
   useEffect(() => {
@@ -887,6 +892,19 @@ function ChildMBTI() {
     document.body.style.background = ageGroup && THEMES[ageGroup] ? THEMES[ageGroup].bodyBg : DEFAULT_BG;
     document.body.style.transition = "background 0.6s ease";
   }, [ageGroup]);
+
+  // 슬라이더 트랙 폭 측정
+  useEffect(() => {
+    if (parentStep !== "slider") return;
+    const measure = () => {
+      if (sliderTrackRef.current) {
+        setSliderTrackWidth(sliderTrackRef.current.offsetWidth);
+      }
+    };
+    measure();
+    window.addEventListener("resize", measure);
+    return () => window.removeEventListener("resize", measure);
+  }, [parentStep]);
 
   useEffect(() => {
     try {
@@ -1037,19 +1055,49 @@ function ChildMBTI() {
     setCurrentQ(currentQ - 1);
   }
 
-  function handleSlider(e) {
-    const v = parseInt(e.target.value);
-    setSliderVal(v);
-    if (parentStep === "slider" && v >= 95) {
-      setTimeout(() => {
-        const q = getRandomQuiz();
-        setQuiz(q);
-        setQuizInput("");
-        setQuizErr(false);
-        setTimer(10);
-        setParentStep("quiz");
-        setSliderVal(0);
-      }, 400);
+  // 부모 인증 슬라이더 — touch/pointer 직접 제어 (CSS transition 없이 손가락 그대로 따라옴)
+  function unlockSliderToQuiz() {
+    const q = getRandomQuiz();
+    setQuiz(q);
+    setQuizInput("");
+    setQuizErr(false);
+    setTimer(10);
+    setParentStep("quiz");
+    setSliderVal(0);
+    sliderValRef.current = 0;
+  }
+  function snapSliderBack() {
+    setSliderVal(0);
+    sliderValRef.current = 0;
+  }
+  function updateSliderFromX(clientX, rect) {
+    const pct = Math.min(100, Math.max(0, ((clientX - rect.left) / rect.width) * 100));
+    sliderValRef.current = pct;
+    setSliderVal(pct);
+  }
+  function onSliderPointerDown(e) {
+    if (parentStep !== "slider" || !sliderTrackRef.current) return;
+    const rect = sliderTrackRef.current.getBoundingClientRect();
+    try { e.currentTarget.setPointerCapture(e.pointerId); } catch {}
+    sliderDragRef.current = { rect, pointerId: e.pointerId };
+    setSliderDragging(true);
+    updateSliderFromX(e.clientX, rect);
+  }
+  function onSliderPointerMove(e) {
+    if (!sliderDragRef.current) return;
+    e.preventDefault();
+    updateSliderFromX(e.clientX, sliderDragRef.current.rect);
+  }
+  function onSliderPointerEnd(e) {
+    if (!sliderDragRef.current) return;
+    try { e.currentTarget.releasePointerCapture(sliderDragRef.current.pointerId); } catch {}
+    sliderDragRef.current = null;
+    setSliderDragging(false);
+    const finalVal = sliderValRef.current;
+    if (finalVal >= 95) {
+      setTimeout(unlockSliderToQuiz, 200);
+    } else {
+      snapSliderBack();
     }
   }
 
@@ -1403,37 +1451,69 @@ function ChildMBTI() {
           </div>
         )}
 
-        {/* 슬라이더 */}
-        {parentStep === "slider" && (
-          <div style={{ textAlign: "center" }}>
-            <div style={{ fontSize: "28px", marginBottom: "8px" }}>👆</div>
-            <p style={{ color: "#666", fontSize: "15px", margin: "0 0 20px" }}>부모님이 직접 슬라이더를 끝까지 밀어주세요</p>
-            <div style={{ position: "relative", padding: "8px 0" }}>
-              <div style={{
-                position: "relative", height: "52px",
-                background: `linear-gradient(90deg, #EDE9FE ${sliderVal}%, #F0F0F0 ${sliderVal}%)`,
-                borderRadius: "26px",
-              }}>
-                <input type="range" min="0" max="100" value={sliderVal} onChange={handleSlider}
-                  style={{ position: "absolute", inset: 0, opacity: 0, width: "100%", height: "100%", cursor: "pointer", zIndex: 2 }} />
-                <div style={{
-                  position: "absolute", top: "50%", left: "50%", transform: "translate(-50%, -50%)",
-                  fontSize: "13px", color: sliderVal > 40 ? "#7C3AED" : "#CCC",
-                  fontWeight: "700", pointerEvents: "none", userSelect: "none",
-                }}>
-                  {sliderVal < 95 ? (sliderVal < 10 ? "← 밀어주세요" : sliderVal < 50 ? "계속 →" : "거의 다 됐어요! →") : "✓"}
+        {/* 슬라이더 — touch/pointer 직접 제어, CSS transition 없음 */}
+        {parentStep === "slider" && (() => {
+          const thumbX = Math.max(0, (sliderVal / 100) * Math.max(0, sliderTrackWidth - 44));
+          const labelText = sliderVal < 95
+            ? (sliderVal < 10 ? "← 밀어주세요" : sliderVal < 50 ? "계속 →" : "거의 다 됐어요! →")
+            : "✓";
+          return (
+            <div style={{ textAlign: "center" }}>
+              <div style={{ fontSize: "28px", marginBottom: "8px" }}>👆</div>
+              <p style={{ color: "#666", fontSize: "15px", margin: "0 0 20px" }}>부모님이 직접 슬라이더를 끝까지 밀어주세요</p>
+              <div style={{ padding: "8px 0" }}>
+                <div
+                  ref={sliderTrackRef}
+                  onPointerDown={onSliderPointerDown}
+                  onPointerMove={onSliderPointerMove}
+                  onPointerUp={onSliderPointerEnd}
+                  onPointerCancel={onSliderPointerEnd}
+                  style={{
+                    position: "relative", height: "52px",
+                    background: "#F0F0F0",
+                    borderRadius: "26px",
+                    overflow: "hidden",
+                    cursor: "pointer",
+                    touchAction: "none",
+                    userSelect: "none",
+                    WebkitUserSelect: "none",
+                  }}
+                >
+                  {/* Fill — 드래그 중엔 transition 없음 */}
+                  <div style={{
+                    position: "absolute", top: 0, left: 0,
+                    width: `${sliderVal}%`, height: "100%",
+                    background: "#EDE9FE",
+                    transition: sliderDragging ? "none" : "width 0.32s cubic-bezier(0.4, 0, 0.2, 1)",
+                    pointerEvents: "none",
+                    willChange: "width",
+                  }} />
+                  {/* Label */}
+                  <div style={{
+                    position: "absolute", inset: 0,
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    fontSize: "13px", color: sliderVal > 40 ? "#7C3AED" : "#999",
+                    fontWeight: 700, pointerEvents: "none",
+                    fontFamily: '"Nanum Gothic", sans-serif',
+                  }}>{labelText}</div>
+                  {/* Thumb — translate3d 로 GPU 가속, 드래그 중엔 transition 없음 */}
+                  <div style={{
+                    position: "absolute", top: "50%", left: 0,
+                    transform: `translate3d(${thumbX}px, -50%, 0)`,
+                    width: "44px", height: "44px", borderRadius: "50%",
+                    background: "linear-gradient(135deg, #7C3AED, #4F46E5)",
+                    boxShadow: "0 4px 12px rgba(124,58,237,0.4)", border: "3px solid white",
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    fontSize: "18px", color: "white",
+                    pointerEvents: "none",
+                    transition: sliderDragging ? "none" : "transform 0.32s cubic-bezier(0.4, 0, 0.2, 1)",
+                    willChange: "transform",
+                  }}>→</div>
                 </div>
-                <div style={{
-                  position: "absolute", top: "50%", left: `calc(${sliderVal}% - 22px)`, transform: "translateY(-50%)",
-                  width: "44px", height: "44px", borderRadius: "50%",
-                  background: "linear-gradient(135deg, #7C3AED, #4F46E5)",
-                  boxShadow: "0 4px 12px rgba(124,58,237,0.4)", border: "3px solid white",
-                  display: "flex", alignItems: "center", justifyContent: "center", fontSize: "18px",
-                  pointerEvents: "none", transition: sliderVal === 0 ? "none" : "left 0.05s",
-                }}>→</div>
               </div>
             </div>
-          </div>
+          );
+        })()}
         )}
 
         {/* 퀴즈 + 타이머 */}
@@ -1539,32 +1619,44 @@ function ChildMBTI() {
                 </p>
               </div>
             ))}
+            {/* 1. 아이+부모 공유 — 메인 컬러 filled (강조) */}
             <button onClick={kakaoShareFull} style={{
               width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: "8px",
-              marginTop: "8px",
-              padding: "14px 18px", borderRadius: "14px", border: "none",
-              background: "#FEE500", color: "#000000d9",
-              fontSize: "15px", fontWeight: 800, fontFamily: "inherit", cursor: "pointer",
-              boxShadow: "0 4px 12px rgba(254,229,0,0.35)",
+              marginTop: "12px",
+              padding: "16px 18px", borderRadius: "16px", border: "none",
+              background: "linear-gradient(135deg, #7C3AED, #4F46E5)",
+              color: "white",
+              fontSize: "16px", fontWeight: 800, fontFamily: "inherit", cursor: "pointer",
+              boxShadow: "0 8px 22px rgba(124,58,237,0.40)",
             }}>
               <span style={{ fontSize: "18px" }}>💬</span> 아이 + 부모 결과 공유하기
             </button>
+
+            {/* 2. 테스트 공유 — 아웃라인 (서브) */}
+            <button onClick={kakaoShareTest} style={{
+              width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: "8px",
+              marginTop: "10px",
+              padding: "14px 18px", borderRadius: "14px",
+              border: "2px solid #FEE500",
+              background: "white", color: "#444",
+              fontSize: "14px", fontWeight: 700, fontFamily: "inherit", cursor: "pointer",
+            }}>
+              <span style={{ fontSize: "17px" }}>💬</span> 테스트 공유하기
+            </button>
+
+            {/* 3. 이미지 저장 — outline (유틸) */}
             <button onClick={saveFullImage} style={{
               width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: "8px",
               marginTop: "10px",
               padding: "14px 18px", borderRadius: "14px",
-              border: "2px solid #5B5FFF30",
-              background: "white", color: "#5B5FFF",
-              fontSize: "15px", fontWeight: 800, fontFamily: "inherit", cursor: "pointer",
+              border: "2px solid #DDD",
+              background: "white", color: "#666",
+              fontSize: "14px", fontWeight: 700, fontFamily: "inherit", cursor: "pointer",
             }}>
-              <span style={{ fontSize: "18px" }}>📥</span> 부모 가이드 이미지로 저장 (1080×1920)
+              <span style={{ fontSize: "17px" }}>📥</span> 이미지 저장 (1080×1920)
             </button>
           </div>
         )}
-
-        <div style={{ marginTop: "12px" }}>
-          {renderTestShareButton(true)}
-        </div>
 
         <button onClick={restart} style={{
           width: "100%", padding: "14px", borderRadius: "16px", border: "2px solid #F0F0F0",

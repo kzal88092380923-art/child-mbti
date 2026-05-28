@@ -10,7 +10,7 @@ const TYPES = ['ENFJ','ENFP','ENTJ','ENTP','ESFJ','ESFP','ESTJ','ESTP','INFJ','I
 
   const browser = await puppeteer.launch({ headless: 'new', args: ['--no-sandbox'] });
   const page = await browser.newPage();
-  await page.setViewport({ width: 1200, height: 630, deviceScaleFactor: 1 });
+  await page.setViewport({ width: 800, height: 400, deviceScaleFactor: 1 });
 
   const templatePath = path.resolve(__dirname, 'og_template.html');
 
@@ -22,7 +22,7 @@ const TYPES = ['ENFJ','ENFP','ENTJ','ENTP','ESFJ','ESFP','ESTJ','ESTP','INFJ','I
     await page.screenshot({
       path: path.resolve(ogDir, `${t}.png`),
       type: 'png',
-      clip: { x: 0, y: 0, width: 1200, height: 630 },
+      clip: { x: 0, y: 0, width: 800, height: 400 },
     });
     console.log(`og/${t}.png`);
   }
@@ -33,7 +33,7 @@ const TYPES = ['ENFJ','ENFP','ENTJ','ENTP','ESFJ','ESFP','ESTJ','ESTP','INFJ','I
   await page.screenshot({
     path: path.resolve(__dirname, 'og-image.png'),
     type: 'png',
-    clip: { x: 0, y: 0, width: 1200, height: 630 },
+    clip: { x: 0, y: 0, width: 800, height: 400 },
   });
   console.log('og-image.png');
 
