@@ -2,13 +2,20 @@
 <html lang="ko">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<meta name="theme-color" content="#FF6B9D" />
+<meta name="format-detection" content="telephone=no" />
 <title>어린이 MBTI 테스트 · 우리 아이는 어떤 동물?</title>
 <meta property="og:title" content="어린이 MBTI · 우리 아이는 어떤 동물?" />
 <meta property="og:description" content="5~13세 아이의 성격을 16가지 동물 캐릭터로 알려드려요" />
 <meta property="og:type" content="website" />
-<meta property="og:url" content="" />
-<meta property="og:image" content="" />
+<meta property="og:url" content="https://child-mbti-preview-jh.netlify.app/?go=1" />
+<meta property="og:image" content="https://child-mbti-preview-jh.netlify.app/og-image.png" />
+<meta property="og:image:width" content="1200" />
+<meta property="og:image:height" content="630" />
+<meta property="og:site_name" content="어린이 MBTI" />
+<meta property="og:locale" content="ko_KR" />
+<meta name="twitter:card" content="summary_large_image" />
 <!-- Google tag (gtag.js) -->
 <script async src="https://www.googletagmanager.com/gtag/js?id=G-HFQCEBY2PW"></script>
 <script>
@@ -372,8 +379,44 @@ function ChildMBTI() {
 
     const style = document.createElement("style");
     style.textContent = `
-      * { box-sizing: border-box; }
-      body { margin: 0; background: linear-gradient(135deg, #FFF5EC 0%, #FFF0F8 50%, #F0EFFF 100%); min-height: 100vh; }
+      * {
+        box-sizing: border-box;
+        -webkit-tap-highlight-color: transparent;
+      }
+      html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+      body {
+        margin: 0;
+        background: linear-gradient(135deg, #FFF5EC 0%, #FFF0F8 50%, #F0EFFF 100%);
+        min-height: 100vh;
+        min-height: 100dvh;
+        padding-top: env(safe-area-inset-top);
+        padding-bottom: env(safe-area-inset-bottom);
+        padding-left: env(safe-area-inset-left);
+        padding-right: env(safe-area-inset-right);
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+        text-rendering: optimizeLegibility;
+        overscroll-behavior-y: none;
+      }
+      button {
+        -webkit-appearance: none;
+        appearance: none;
+        touch-action: manipulation;
+        -webkit-user-select: none;
+        user-select: none;
+      }
+      input, textarea {
+        -webkit-appearance: none;
+        appearance: none;
+        font-family: inherit;
+      }
+      /* 데스크탑 큰 화면에서 카드 여유 */
+      @media (min-width: 768px) {
+        body { font-size: 17px; }
+      }
+      @media (min-width: 1024px) {
+        body { font-size: 18px; }
+      }
       input[type=range] { -webkit-appearance: none; appearance: none; width: 100%; height: 52px; background: transparent; cursor: pointer; }
       input[type=range]::-webkit-slider-runnable-track { height: 8px; border-radius: 4px; background: #E8E8E8; }
       input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 44px; height: 44px; border-radius: 50%; background: linear-gradient(135deg, #7C3AED, #4F46E5); border: 3px solid white; box-shadow: 0 4px 12px rgba(124,58,237,0.4); margin-top: -18px; }
@@ -1006,6 +1049,19 @@ function ChildMBTI() {
               >← 이전 문항으로 돌아가기</button>
             </div>
           )}
+
+          {/* 질문 페이지 하단 — 테스트 공유 */}
+          <div style={{ display: "flex", justifyContent: "center", marginTop: "18px" }}>
+            <button onClick={kakaoShareTest} style={{
+              display: "flex", alignItems: "center", justifyContent: "center", gap: "6px",
+              padding: "10px 18px", borderRadius: "12px", border: "none",
+              background: "#FEE500", color: "#000000d9",
+              fontSize: "13px", fontWeight: 800, fontFamily: "inherit", cursor: "pointer",
+              boxShadow: "0 3px 10px rgba(254,229,0,0.30)",
+            }}>
+              <span style={{ fontSize: "15px" }}>💬</span> 친구에게 테스트 공유
+            </button>
+          </div>
         </div>
       </div>
     );

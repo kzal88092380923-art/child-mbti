@@ -9,6 +9,10 @@
   body {
     font-family: "Apple SD Gothic Neo", "Nanum Gothic", system-ui, sans-serif;
     color: #2D2D2D;
+    -webkit-font-smoothing: antialiased;
+  }
+  .emoji {
+    font-family: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", "Twemoji Mozilla", system-ui, sans-serif;
   }
   .card {
     width: 1200px; height: 630px;
@@ -16,34 +20,39 @@
     background: var(--bg);
     display: flex; flex-direction: column;
     align-items: center; justify-content: center;
-    padding: 40px 40px 60px;
+    padding: 36px 60px 50px;
     text-align: center;
   }
-  /* per-type layout — 동물 중앙 정렬 */
+
+  /* per-type layout — 동물 dead-center, 작게 */
   .label {
-    font-size: 22px; color: #88888888; font-weight: 700;
-    letter-spacing: 0.5px; margin-bottom: 14px;
+    font-size: 22px; color: #88888899; font-weight: 700;
+    letter-spacing: 0.5px; margin-bottom: 18px;
   }
   .circle {
-    width: 300px; height: 300px; border-radius: 50%;
+    width: 240px; height: 240px; border-radius: 50%;
     background: #ffffff;
     display: flex; align-items: center; justify-content: center;
-    font-size: 200px; line-height: 1;
-    box-shadow: 0 24px 64px var(--shadow), inset 0 0 0 6px rgba(255,255,255,0.6);
-    margin-bottom: 20px;
+    line-height: 1;
+    box-shadow: 0 20px 56px var(--shadow), inset 0 0 0 6px rgba(255,255,255,0.6);
+    margin-bottom: 24px;
+  }
+  .circle .e {
+    font-size: 150px; line-height: 1;
+    transform: translateY(2px);
   }
   .badge {
-    display: inline-block; padding: 8px 24px; border-radius: 28px;
+    display: inline-block; padding: 8px 22px; border-radius: 28px;
     background: #ffffffee; color: var(--accent);
-    font-size: 28px; font-weight: 800; letter-spacing: 4px;
-    margin-bottom: 12px;
+    font-size: 26px; font-weight: 800; letter-spacing: 4px;
+    margin-bottom: 14px;
   }
   .name {
-    font-size: 72px; color: var(--accent); font-weight: 800;
+    font-size: 68px; color: var(--accent); font-weight: 800;
     line-height: 1.0; margin-bottom: 10px;
   }
   .tag {
-    font-size: 26px; color: #555; font-weight: 700;
+    font-size: 24px; color: #555; font-weight: 700;
   }
   .footer {
     position: absolute; bottom: 22px; right: 30px;
@@ -52,27 +61,30 @@
 
   /* default mode (no type) */
   body.default .card {
-    display: block; padding: 70px 80px;
+    padding: 70px 80px;
     background: linear-gradient(135deg, #FFE5EC 0%, #FFEDD5 50%, #E9ECFF 100%);
+    justify-content: center;
   }
   body.default .title {
-    font-size: 76px; font-weight: 800; color: #2D2D2D;
-    margin-bottom: 14px; letter-spacing: -1px;
+    font-size: 64px; font-weight: 800; color: #2D2D2D;
+    margin-bottom: 12px; letter-spacing: -1px;
   }
   body.default .subtitle {
-    font-size: 30px; color: #666; font-weight: 700;
-    margin-bottom: 36px;
+    font-size: 26px; color: #666; font-weight: 700;
+    margin-bottom: 32px;
   }
   body.default .grid {
     display: grid;
     grid-template-columns: repeat(8, 1fr);
-    gap: 12px;
-    font-size: 80px; line-height: 1;
-    text-align: center;
+    column-gap: 4px; row-gap: 10px;
+    font-size: 64px; line-height: 1;
+    width: 880px; max-width: 100%;
+    margin: 0 auto;
   }
+  body.default .grid span { display: inline-block; line-height: 1; }
   body.default .desc {
-    font-size: 26px; color: #555; font-weight: 600;
-    margin-top: 32px; line-height: 1.5;
+    font-size: 22px; color: #777; font-weight: 600;
+    margin-top: 28px; line-height: 1.5;
   }
 </style>
 </head>
@@ -104,12 +116,12 @@ const type = params.get("type");
 const card = document.getElementById("card");
 
 if (!type || !CHARS[type]) {
-  // 기본 OG 카드 (테스트 공유용)
+  // 기본 OG (테스트 공유용)
   document.body.classList.add("default");
   card.innerHTML = `
     <div class="title">🌟 어린이 MBTI</div>
     <div class="subtitle">우리 아이는 어떤 동물일까?</div>
-    <div class="grid">
+    <div class="grid emoji">
       <span>🦁</span><span>🦜</span><span>🦅</span><span>🦊</span><span>🐶</span><span>🐬</span><span>🦫</span><span>🐆</span>
       <span>🦉</span><span>🐱</span><span>🐙</span><span>🦝</span><span>🐰</span><span>🐼</span><span>🐢</span><span>🦔</span>
     </div>
@@ -122,7 +134,7 @@ if (!type || !CHARS[type]) {
   document.documentElement.style.setProperty("--shadow", c.color + "30");
   card.innerHTML = `
     <div class="label">어린이 MBTI · 우리 아이는 어떤 동물?</div>
-    <div class="circle">${c.emoji}</div>
+    <div class="circle"><span class="e emoji">${c.emoji}</span></div>
     <div class="badge">${type}</div>
     <div class="name">${c.name}형</div>
     <div class="tag">${c.tag}</div>
