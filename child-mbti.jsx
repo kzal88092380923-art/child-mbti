@@ -1464,7 +1464,6 @@ export default function ChildMBTI() {
             </div>
           );
         })()}
-        )}
 
         {/* 퀴즈 + 타이머 */}
         {parentStep === "quiz" && quiz && (
