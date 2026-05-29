@@ -573,7 +573,7 @@ export default function ChildMBTI() {
       title: "🌟 어린이 MBTI · 우리 아이는 어떤 동물?",
       description: "우리 아이 MBTI 해봐!\n5~13세 아이의 성격을 16가지 동물 캐릭터로 알려줘요 🐣",
       buttonTitle: "테스트 하러 가기",
-      shareUrl: SHARE_BASE_URL,
+      shareUrl: SHARE_BASE_URL + "?new=1",
     });
   }
   function kakaoShareChild() {
@@ -875,6 +875,19 @@ export default function ChildMBTI() {
 
   useEffect(() => {
     try {
+      // ?new=1 (테스트 공유 링크) → 복원 건너뛰고 항상 welcome 으로
+      const params = new URLSearchParams(window.location.search);
+      if (params.get("new") === "1") {
+        window.localStorage.removeItem(STORAGE_KEY);
+        setScreen("welcome");
+        params.delete("new");
+        const cleanQs = params.toString();
+        const newUrl = window.location.pathname + (cleanQs ? "?" + cleanQs : "") + window.location.hash;
+        window.history.replaceState(null, "", newUrl);
+        restoreRef.current = true;
+        return;
+      }
+
       const raw = window.localStorage.getItem(STORAGE_KEY);
       if (!raw) {
         restoreRef.current = true;
