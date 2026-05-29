@@ -385,11 +385,6 @@ export default function ChildMBTI() {
   const DEFAULT_BG = "linear-gradient(135deg, #FFF5EC 0%, #FFF0F8 50%, #F0EFFF 100%)";
 
   useEffect(() => {
-    const link = document.createElement("link");
-    link.href = "https://fonts.googleapis.com/css2?family=Jua&family=Nanum+Gothic:wght@400;700;800&display=swap";
-    link.rel = "stylesheet";
-    document.head.appendChild(link);
-
     const style = document.createElement("style");
     style.textContent = `
       * {
@@ -510,7 +505,6 @@ export default function ChildMBTI() {
     setNameMeta("twitter:image", ogImageUrl);
 
     return () => {
-      link.remove();
       style.remove();
     };
   }, []);
@@ -806,6 +800,8 @@ export default function ChildMBTI() {
   const [quizErr, setQuizErr] = useState(false);
   const [timer, setTimer] = useState(null);
   const [shakeKey, setShakeKey] = useState(0);
+  const [quizFailCount, setQuizFailCount] = useState(0);
+  const [quizMode, setQuizMode] = useState("nostalgia");
 
   const timerRef = useRef(null);
   const restoreRef = useRef(false);
@@ -816,21 +812,42 @@ export default function ChildMBTI() {
   const [sliderDragging, setSliderDragging] = useState(false);
   const [sliderTrackWidth, setSliderTrackWidth] = useState(280);
 
-  // 타이머 로직
+  // ── easy 모드 (간단 덧셈 인증) ──
+  function makeEasyQuiz() {
+    const a = 11 + Math.floor(Math.random() * 79); // 11~89
+    const b = 11 + Math.floor(Math.random() * 79);
+    return { a, b };
+  }
+  function switchToEasyMode() {
+    clearTimeout(timerRef.current);
+    setQuizMode("easy");
+    setQuiz(makeEasyQuiz());
+    setQuizInput("");
+    setQuizErr(false);
+    setTimer(null);
+  }
+
+  // 타이머 로직 (nostalgia 모드에서만 동작)
   useEffect(() => {
-    if (parentStep !== "quiz" || timer === null) return;
+    if (parentStep !== "quiz" || quizMode !== "nostalgia" || timer === null) return;
     if (timer === 0) {
-      // 시간 초과 → 새 문제
-      setQuizInput("");
-      setQuizErr(false);
-      const next = getRandomQuiz();
-      setQuiz(next);
-      setTimer(10);
+      // 시간 초과 → 실패 +1
+      const nextFail = quizFailCount + 1;
+      setQuizFailCount(nextFail);
+      if (nextFail >= 3) {
+        switchToEasyMode();
+      } else {
+        setQuizInput("");
+        setQuizErr(false);
+        const next = getRandomQuiz();
+        setQuiz(next);
+        setTimer(10);
+      }
       return;
     }
     timerRef.current = setTimeout(() => setTimer(t => t - 1), 1000);
     return () => clearTimeout(timerRef.current);
-  }, [timer, parentStep]);
+  }, [timer, parentStep, quizMode, quizFailCount]);
 
   // parentStep이 open으로 바뀌면 타이머 정리
   useEffect(() => {
@@ -1012,6 +1029,8 @@ export default function ChildMBTI() {
     setQuizInput("");
     setQuizErr(false);
     setTimer(10);
+    setQuizFailCount(0);
+    setQuizMode("nostalgia");
     setParentStep("quiz");
     setSliderVal(0);
     sliderValRef.current = 0;
@@ -1053,6 +1072,26 @@ export default function ChildMBTI() {
 
   function checkQuiz() {
     if (!quiz) return;
+
+    // easy 모드 — 덧셈 검증, 절대 nostalgia 로 돌아가지 않음
+    if (quizMode === "easy") {
+      const guess = parseInt(quizInput, 10);
+      if (!Number.isNaN(guess) && guess === quiz.a + quiz.b) {
+        setParentStep("open");
+        trackEvent("parent_unlock_success", { result_type: result || "unknown", mode: "easy" });
+      } else {
+        setQuizErr(true);
+        setShakeKey(k => k + 1);
+        setQuizInput("");
+        setTimeout(() => {
+          setQuizErr(false);
+          setQuiz(makeEasyQuiz());
+        }, 800);
+      }
+      return;
+    }
+
+    // nostalgia 모드 — 기존 동작
     const normalize = s => s.trim().toLowerCase().replace(/\s/g, "").replace(/\./g, "");
     const userAns = normalize(quizInput);
     const correctAns = normalize(quiz.a);
@@ -1062,16 +1101,26 @@ export default function ChildMBTI() {
       setTimer(null);
       trackEvent("parent_unlock_success", { result_type: result || "unknown" });
     } else {
+      // 오답 → 실패 +1
+      const nextFail = quizFailCount + 1;
+      setQuizFailCount(nextFail);
       setQuizErr(true);
       setShakeKey(k => k + 1);
       setQuizInput("");
       clearTimeout(timerRef.current);
-      setTimeout(() => {
-        setQuizErr(false);
-        const next = getRandomQuiz();
-        setQuiz(next);
-        setTimer(10);
-      }, 1200);
+      if (nextFail >= 3) {
+        setTimeout(() => {
+          setQuizErr(false);
+          switchToEasyMode();
+        }, 800);
+      } else {
+        setTimeout(() => {
+          setQuizErr(false);
+          const next = getRandomQuiz();
+          setQuiz(next);
+          setTimer(10);
+        }, 1200);
+      }
     }
   }
 
@@ -1082,6 +1131,7 @@ export default function ChildMBTI() {
     setAnswerHistory([]); setSlideDir("next"); setTappedCh(null); setResultStep("reveal");
     setResult(null); setParentStep("locked"); setSliderVal(0);
     setQuiz(null); setQuizInput(""); setQuizErr(false); setTimer(null);
+    setQuizFailCount(0); setQuizMode("nostalgia");
     window.localStorage.removeItem(STORAGE_KEY);
   }
 
@@ -1096,14 +1146,16 @@ export default function ChildMBTI() {
     ));
   }
 
-  function renderTestShareButton(compact = false) {
+  function renderTestShareButton(compact = false, outline = false) {
     return (
       <button onClick={kakaoShareTest} style={{
         width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: "8px",
-        padding: compact ? "12px 16px" : "14px 18px", borderRadius: "14px", border: "none",
-        background: "#FEE500", color: "#000000d9",
-        fontSize: compact ? "14px" : "15px", fontWeight: 800, fontFamily: "inherit", cursor: "pointer",
-        boxShadow: "0 4px 12px rgba(254,229,0,0.35)",
+        padding: compact ? "12px 16px" : "14px 18px", borderRadius: "14px",
+        border: outline ? "2px solid #FEE500" : "none",
+        background: outline ? "white" : "#FEE500",
+        color: outline ? "#444" : "#000000d9",
+        fontSize: compact ? "14px" : "15px", fontWeight: outline ? 700 : 800, fontFamily: "inherit", cursor: "pointer",
+        boxShadow: outline ? "none" : "0 4px 12px rgba(254,229,0,0.35)",
       }}>
         <span style={{ fontSize: compact ? "17px" : "18px" }}>💬</span> 테스트 공유하기
       </button>
@@ -1155,8 +1207,13 @@ export default function ChildMBTI() {
             </button>
           ))}
         </div>
-        <div style={{ marginTop: "18px" }}>
-          {renderTestShareButton()}
+        <div style={{ textAlign: "center", marginTop: "18px" }}>
+          <button onClick={kakaoShareTest} style={{
+            background: "transparent", border: "none",
+            color: "#BBB", fontSize: "13px",
+            fontFamily: '"Nanum Gothic", sans-serif', cursor: "pointer",
+            padding: "6px 10px",
+          }}>친구에게 테스트 공유하기</button>
         </div>
       </div>
     </div>
@@ -1271,11 +1328,6 @@ export default function ChildMBTI() {
               >← 이전 문항으로 돌아가기</button>
             </div>
           )}
-
-          {/* 질문 페이지 하단 — 테스트 공유 */}
-          <div style={{ marginTop: "18px" }}>
-            {renderTestShareButton(true)}
-          </div>
         </div>
       </div>
     );
@@ -1315,7 +1367,8 @@ export default function ChildMBTI() {
             onMouseEnter={e => (e.currentTarget.style.transform = "translateY(-2px)")}
             onMouseLeave={e => (e.currentTarget.style.transform = "translateY(0)")}
           >나에 대해 더 알아보기 →</button>
-          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "10px", marginTop: "16px" }}>
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "stretch", gap: "10px", marginTop: "16px", maxWidth: "320px", marginLeft: "auto", marginRight: "auto" }}>
+            {/* ② 결과 카톡 공유 — 노랑 filled */}
             <button onClick={kakaoShareChild} style={{
               display: "flex", alignItems: "center", justifyContent: "center", gap: "8px",
               padding: "12px 22px", borderRadius: "14px", border: "none",
@@ -1325,6 +1378,9 @@ export default function ChildMBTI() {
             }}>
               <span style={{ fontSize: "17px" }}>💬</span> 결과 카톡으로 공유하기
             </button>
+            {/* ③ 테스트 공유 — outline */}
+            {renderTestShareButton(true, true)}
+            {/* ④ 이미지로 저장 — outline (맨 뒤) */}
             <button onClick={saveChildImage} style={{
               display: "flex", alignItems: "center", justifyContent: "center", gap: "8px",
               padding: "12px 22px", borderRadius: "14px",
@@ -1332,11 +1388,8 @@ export default function ChildMBTI() {
               background: "white", color: char.color,
               fontSize: "14px", fontWeight: 800, fontFamily: "inherit", cursor: "pointer",
             }}>
-              <span style={{ fontSize: "16px" }}>📥</span> 이미지로 저장 (1080×1080)
+              <span style={{ fontSize: "16px" }}>📥</span> 이미지로 저장 (인스타·카톡용)
             </button>
-            <div style={{ width: "100%", maxWidth: "320px" }}>
-              {renderTestShareButton(true)}
-            </div>
           </div>
         </div>
       </div>
@@ -1465,48 +1518,73 @@ export default function ChildMBTI() {
           );
         })()}
 
-        {/* 퀴즈 + 타이머 */}
+        {/* 퀴즈 + 타이머 (nostalgia) / 간단 인증 (easy) */}
         {parentStep === "quiz" && quiz && (
           <div style={{ textAlign: "center" }}>
-            {/* 타이머 원형 */}
-            <div style={{ display: "flex", justifyContent: "center", marginBottom: "12px" }}>
-              <div style={{
-                width: "64px", height: "64px", borderRadius: "50%",
-                background: timer <= 2 ? "#FF4444" : timer <= 4 ? "#FF8C42" : "#7C3AED",
-                display: "flex", alignItems: "center", justifyContent: "center",
-                color: "white", fontSize: "28px", fontWeight: "800",
-                boxShadow: `0 4px 16px ${timer <= 2 ? "#FF444440" : timer <= 4 ? "#FF8C4240" : "#7C3AED40"}`,
-                transition: "background 0.3s",
-                fontFamily: '"Nanum Gothic", sans-serif',
-              }}>{timer}</div>
-            </div>
-            <p style={{ color: "#AAA", fontSize: "12px", margin: "0 0 16px" }}>시간 초과 시 새 문제로 바뀌어요</p>
+            {/* 타이머 원형 — nostalgia 모드에서만 */}
+            {quizMode === "nostalgia" && (
+              <>
+                <div style={{ display: "flex", justifyContent: "center", marginBottom: "12px" }}>
+                  <div style={{
+                    width: "64px", height: "64px", borderRadius: "50%",
+                    background: timer <= 2 ? "#FF4444" : timer <= 4 ? "#FF8C42" : "#7C3AED",
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    color: "white", fontSize: "28px", fontWeight: "800",
+                    boxShadow: `0 4px 16px ${timer <= 2 ? "#FF444440" : timer <= 4 ? "#FF8C4240" : "#7C3AED40"}`,
+                    transition: "background 0.3s",
+                    fontFamily: '"Nanum Gothic", sans-serif',
+                  }}>{timer}</div>
+                </div>
+                <p style={{ color: "#AAA", fontSize: "12px", margin: "0 0 16px" }}>시간 초과 시 새 문제로 바뀌어요</p>
+              </>
+            )}
 
-            {/* 문제 */}
-            <div key={quiz.q} style={{
-              background: "#F8F6FF", borderRadius: "16px", padding: "18px",
-              marginBottom: "12px", animation: "slideUp 0.3s ease",
-            }}>
-              <p style={{ margin: "0 0 10px", fontSize: "17px", color: "#333", fontWeight: "700", lineHeight: 1.6 }}>{quiz.q}</p>
-              <div style={{
-                background: "#EDE9FE", borderRadius: "10px", padding: "10px 14px",
-                fontSize: "14px", color: "#7C3AED", lineHeight: 1.5,
-                fontFamily: '"Nanum Gothic", sans-serif',
-              }}>{quiz.hint}</div>
-            </div>
+            {/* easy 모드 안내 문구 */}
+            {quizMode === "easy" && (
+              <p style={{ color: "#7C3AED", fontSize: "14px", margin: "0 0 16px", fontWeight: 700, fontFamily: '"Nanum Gothic", sans-serif' }}>
+                추억 퀴즈가 어려우셨나요? 간단 인증으로 바꿔드렸어요 🙂
+              </p>
+            )}
+
+            {/* 문제 — 모드별 분기 */}
+            {quizMode === "nostalgia" ? (
+              <div key={quiz.q} style={{
+                background: "#F8F6FF", borderRadius: "16px", padding: "18px",
+                marginBottom: "12px", animation: "slideUp 0.3s ease",
+              }}>
+                <p style={{ margin: "0 0 10px", fontSize: "17px", color: "#333", fontWeight: "700", lineHeight: 1.6 }}>{quiz.q}</p>
+                <div style={{
+                  background: "#EDE9FE", borderRadius: "10px", padding: "10px 14px",
+                  fontSize: "14px", color: "#7C3AED", lineHeight: 1.5,
+                  fontFamily: '"Nanum Gothic", sans-serif',
+                }}>{quiz.hint}</div>
+              </div>
+            ) : (
+              <div key={`${quiz.a}-${quiz.b}`} style={{
+                background: "#F8F6FF", borderRadius: "16px", padding: "28px 18px",
+                marginBottom: "12px", animation: "slideUp 0.3s ease",
+              }}>
+                <p style={{
+                  margin: 0, fontSize: "40px", color: "#333", fontWeight: 800, lineHeight: 1.2,
+                  fontFamily: '"Nanum Gothic", sans-serif', letterSpacing: "1px",
+                }}>{quiz.a} + {quiz.b} = ?</p>
+              </div>
+            )}
 
             {quizErr && (
               <p style={{ color: "#FF6B6B", fontSize: "14px", margin: "0 0 8px" }}>
-                틀렸어요! 새 문제로 바꿀게요 😅
+                {quizMode === "easy" ? "다시 한 번 풀어볼까요?" : "틀렸어요! 새 문제로 바꿀게요 😅"}
               </p>
             )}
 
             <div key={shakeKey} className={quizErr ? "shake" : ""} style={{ display: "flex", gap: "8px" }}>
               <input
-                type="text" value={quizInput}
+                type={quizMode === "easy" ? "number" : "text"}
+                inputMode={quizMode === "easy" ? "numeric" : "text"}
+                value={quizInput}
                 onChange={e => setQuizInput(e.target.value)}
                 onKeyDown={e => e.key === "Enter" && quizInput && checkQuiz()}
-                placeholder="정답 입력"
+                placeholder={quizMode === "easy" ? "숫자 입력" : "정답 입력"}
                 style={{
                   flex: 1, padding: "14px", borderRadius: "14px",
                   border: `2px solid ${quizErr ? "#FF6B6B" : "#E0E0E0"}`,
@@ -1602,7 +1680,7 @@ export default function ChildMBTI() {
               background: "white", color: "#666",
               fontSize: "14px", fontWeight: 700, fontFamily: "inherit", cursor: "pointer",
             }}>
-              <span style={{ fontSize: "17px" }}>📥</span> 이미지 저장 (1080×1920)
+              <span style={{ fontSize: "17px" }}>📥</span> 이미지로 저장 (스토리용)
             </button>
           </div>
         )}
