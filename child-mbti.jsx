@@ -329,7 +329,7 @@ function getRandomQuiz() {
   return QUIZ_POOL[idx];
 }
 
-const SHARE_BASE_URL = "https://child-mbti-preview-jh.netlify.app";
+const SHARE_BASE_URL = "https://mbti.superstarkzal.com";
 const KAKAO_APP_KEY = "fef83dd39740084a58f68fbdf626d2e0";
 const STORAGE_KEY = "child-mbti-state-v2";
 const EMPTY_SCORES = Object.freeze({ E: 0, I: 0, S: 0, N: 0, T: 0, F: 0, J: 0, P: 0 });
